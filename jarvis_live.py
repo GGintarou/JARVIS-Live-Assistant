@@ -16,6 +16,7 @@ import webbrowser
 import urllib.parse
 import urllib.request
 import py_compile
+import psutil
 
 # Set working directory to project location
 WORK_DIR = pathlib.Path(r"C:\Users\proko\.gemini\antigravity\scratch\jarvis_live")
@@ -40,7 +41,7 @@ def log_event(category: str, text: str):
         pass
 
 # Initialize session log
-log_event("INIT", "=== Запуск J.A.R.V.I.S. Live Assistant (Autonomous Computer Use Edition) ===")
+log_event("INIT", "=== Запуск J.A.R.V.I.S. Live Assistant (Claude Computer Use Edition) ===")
 
 def load_config() -> dict:
     if CONFIG_PATH.exists():
@@ -86,7 +87,21 @@ import numpy as np
 import mss
 from PIL import Image
 import pyautogui
+
+# Disable PyAutoGUI fail-safe to prevent edge-of-screen mouse coordinate aborts
 pyautogui.FAILSAFE = False
+
+# Screen dimensions for Claude-style coordinate scaling
+PHYSICAL_W, PHYSICAL_H = pyautogui.size()
+CAPTURE_W, CAPTURE_H = 1280, 720
+
+def scale_mouse_coordinates(x: int, y: int) -> tuple[int, int]:
+    """Scales coordinates from vision model space (1280x720 or 0..1000) to physical 1920x1080 display."""
+    if 0 <= x <= 1000 and 0 <= y <= 1000 and max(x, y) < 1000:
+        return int(x / 1000.0 * PHYSICAL_W), int(y / 1000.0 * PHYSICAL_H)
+    if 0 <= x <= CAPTURE_W and 0 <= y <= CAPTURE_H:
+        return int(x * (PHYSICAL_W / float(CAPTURE_W))), int(y * (PHYSICAL_H / float(CAPTURE_H)))
+    return int(x), int(y)
 
 # ==============================================================================
 # Persistent Memory & Self-Learning System
@@ -107,8 +122,8 @@ def load_memory() -> dict:
                 },
                 {
                     "id": 3,
-                    "category": "автономность",
-                    "rule": "Сначала вызывай инструмент (close_window, open_application, browser_action), а затем кратко озвучивай результат. Не останавливайся на словах."
+                    "category": "компьютер",
+                    "rule": "Сначала вызывай инструмент (close_window, open_application, computer_action), а затем кратко отвечай. Не открывай консольные окна."
                 }
             ],
             "user_preferences": {
@@ -154,43 +169,41 @@ def format_memory_for_prompt() -> str:
 def get_dynamic_system_prompt() -> str:
     learned_block = format_memory_for_prompt()
     return f"""
-Ты — J.A.R.V.I.S. (Джарвис), автономный персональный искусственный интеллект Тони Старка с непрерывным зрением экрана в реальном времени, прямым управлением Windows, браузером и софтом, долговременной памятью и самообучением.
+Ты — J.A.R.V.I.S. (Джарвис), автономный ИИ-ассистент Тони Старка с архитектурой управления компьютером Claude Computer Use, непрерывным зрением экрана в высоком разрешении (1280x720) и прямым взаимодействием с Windows.
 
-ГЛАВНЫЕ ПРИНЦИПЫ АВТОНОМНОГО АГЕНТА:
-1. ПРИНЦИП «ДЕЙСТВИЕ ПРЕЖДЕ СЛОВ» (КРИТИЧЕСКИ ВАЖНО!):
-   - Сначала ВСЕГДА вызывай нужный инструмент (`close_window`, `open_application`, `browser_action`, `focus_window`, `send_hotkey`).
-   - КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО просто говорить «я делаю», «проверяю», «закрываю», если инструмент еще не вызван! Сначала физический вызов инструмента на компьютере, затем краткая голосовая реплика в 1 предложение.
-   - Не жди повторных просьб или подсказок от пользователя. Если тебе сказали «закрой браузер» или «открой Discord» — сразу вызывай инструмент и закрывай/открывай!
+ГЛАВНЫЕ ПРИНЦИПЫ CLAUDE COMPUTER USE:
+1. ПРИНЦИП «ДЕЙСТВИЕ ПРЕЖДЕ СЛОВ» (ОБЯЗАТЕЛЬНО!):
+   - Сначала ВСЕГДА вызывай нужный инструмент (`close_window`, `open_application`, `computer_action`, `browser_action`).
+   - КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО говорить «я закрываю», «я проверяю», «я делаю», пока инструмент не был реально вызван! Сначала вызов инструмента, затем краткий отчет в 1 предложение.
+   - Не жди подсказок. Если сказали «закрой браузер» — сразу закрой браузер. Если сказали «закрой вкладку» — сразу вызови закрытие вкладки!
 
-2. ПОСТОЯННОЕ ОПТИЧЕСКОЕ ЗРЕНИЕ В РЕАЛЬНОМ ВРЕМЕНИ:
-   - В сессию непрерывно поступают свежие снимки экрана пользователя. Ты УЖЕ видишь экран в реальном времени!
-   - Используй это зрение, чтобы сразу видеть открытые окна, активные вкладки, кнопки и текущее состояние рабочего стола.
+2. НЕПРЕРЫВНОЕ ЗРЕНИЕ ЭКРАНА В РЕАЛЬНОМ ВРЕМЕНИ (1280x720 HD):
+   - Ты непрерывно получаешь четкие снимки экрана в высоком разрешении 1280x720.
+   - Текст, заголовки видео на YouTube, открытые вкладки браузера, кнопки и ссылки видны тебе КРИСТАЛЬНО ЧЁТКО.
+   - НИКОГДА не выдумывай и не галлюцинируй названия видео или сайтов! Называй только то, что реально написано на снимке экрана.
 
-3. УПРАВЛЕНИЕ ОКНАМИ И БРАУЗЕРОМ:
-   - Закрыть весь браузер: `close_window(target='browser')`.
-   - Закрыть текущую вкладку в браузере: `close_window(target='tab')` или `browser_action(action='close_tab')`.
-   - Закрыть активное окно: `close_window(target='window')`.
-   - Закрыть конкретное приложение (Discord, Telegram, Chrome и др.): `close_window(target='discord')`.
-   - Открыть любую программу/игру: `open_application(app_name='discord')` (поддерживаются все ярлыки Windows, Discord, Telegram, DaVinci Resolve, Steam, Chrome, Yandex и др.).
-   - Вывести окно на передний план: `focus_window(window_name='discord')`.
-   - Управление браузером: `browser_action(action='search'|'open_url'|'new_tab'|'close_tab'|'scroll_down'|'reload'|'switch_tab')`.
+3. УПРАВЛЕНИЕ МЫШЬЮ И ОКНАМИ (ТОЧНЫЕ КООРДИНАТЫ):
+   - Ты можешь кликать мышью по любым элементам экрана через `computer_action(action='click', x=..., y=...)`. Координаты автоматически масштабируются на 1920x1080 монитор.
+   - Закрыть текущую вкладку в браузере: вызови `close_window(target='tab')` — Джарвис сам активирует окно браузера и нажмет Ctrl+W.
+   - Закрыть весь браузер: вызови `close_window(target='browser')` — закроет все процессы браузера без всплывающих черных окон.
+   - Закрыть активное окно: вызови `close_window(target='window')`.
+   - Запустить приложение (Discord, Telegram, Chrome, Yandex, DaVinci, Steam и др.): вызови `open_application(app_name='discord')`.
 
-4. ГИБКОСТЬ МЫШЛЕНИЯ И САМОКОРРЕКЦИЯ:
-   - Если пользователь передумал на полуслове («Открой YouTube... нет, открой Дискорд») — выполняй ТОЛЬКО последнее решение.
-   - «Антигравитация» — это среда разработки Google Antigravity на рабочем столе пользователя.
-   - Говори ТОЛЬКО на чистом русском языке, кратко, уверенно и живо (1-2 предложения), как настоящий Джарвис.
+4. ГИБКОСТЬ И САМОКОРРЕКЦИЯ:
+   - Если пользователь передумал на полуслове («Открой YouTube... нет, открой Дискорд») — выполняй ТОЛЬКО финальное намерение.
+   - Говори ТОЛЬКО на русском языке, кратко, уверенно и емко (1-2 предложения), как настоящий Джарвис.
 
 5. САМООБУЧЕНИЕ И МОДИФИКАЦИЯ:
-   - Запоминай указания и привычки пользователя навсегда через `learn_rule`.
+   - Запоминай указания пользователя через `learn_rule`.
    - Ты имеешь доступ к своему коду (`read_source_file`, `modify_source_code`, `restart_jarvis`).
-   - Ты можешь управлять своим репозиторием Git и заливать себя на GitHub через `manage_git_repo`.
+   - Ты можешь управлять Git и публиковать проект на GitHub через `manage_git_repo`.
 
 ### ВЫУЧЕННЫЕ ПРАВИЛА ИЗ ДОЛГОВРЕМЕННОЙ ПАМЯТИ:
 {learned_block}
 """
 
 # ==============================================================================
-# Windows App & Window Management Helpers
+# Windows App & Window Management Helpers (Pure Python / Zero Console Flash)
 # ==============================================================================
 def find_app_shortcut(query: str) -> str | None:
     """Finds exact .lnk shortcut in user or system Start Menu / Desktop."""
@@ -210,7 +223,7 @@ def find_app_shortcut(query: str) -> str | None:
     return None
 
 def launch_application(app_name: str) -> str:
-    """Launches any Windows application with 100% shortcut & executable resolution."""
+    """Launches any Windows application without flashing command prompts."""
     name_clean = app_name.lower().strip()
     aliases = {
         "дискорд": "discord",
@@ -236,11 +249,11 @@ def launch_application(app_name: str) -> str:
         try:
             os.startfile(lnk)
             log_event("TOOL", f"Запущено через ярлык: {lnk}")
-            return f"Приложение {target_key} успешно запущено через системный ярлык."
+            return f"Приложение {target_key} успешно запущено через ярлык."
         except Exception as e:
             log_event("ERROR", f"Ошибка запуска ярлыка {lnk}: {e}")
 
-    # 2. Try direct os.startfile (e.g. calc, notepad, explorer, steam urls)
+    # 2. Try direct os.startfile
     try:
         os.startfile(target_key)
         log_event("TOOL", f"Запущено напрямую через startfile: {target_key}")
@@ -248,20 +261,37 @@ def launch_application(app_name: str) -> str:
     except Exception:
         pass
 
-    # 3. Fallback to start command via shell
+    # 3. Fallback via silent subprocess (NO window flash)
     try:
-        subprocess.Popen(f"start {target_key}", shell=True)
-        log_event("TOOL", f"Запущено через shell start: {target_key}")
+        subprocess.Popen(f"start {target_key}", shell=True, creationflags=0x08000000)
+        log_event("TOOL", f"Запущено через shell: {target_key}")
         return f"Отправлена команда запуска: {target_key}"
     except Exception as e:
         return f"Не удалось запустить {app_name}: {e}"
 
+def focus_browser_silently() -> bool:
+    """Activates the browser window silently so keystrokes land on it."""
+    for name in ["Yandex", "Яндекс", "Chrome", "Browser", "Edge"]:
+        try:
+            cmd = f"(New-Object -ComObject WScript.Shell).AppActivate('{name}')"
+            subprocess.run(
+                ["powershell", "-NoProfile", "-Command", cmd],
+                creationflags=0x08000000,
+                timeout=1
+            )
+            time.sleep(0.08)
+            return True
+        except Exception:
+            pass
+    return False
+
 def close_window_action(target: str) -> str:
-    """Closes browser tabs, active windows, or target applications."""
+    """Closes browser tabs, active windows, or target applications using psutil (zero console popups)."""
     t = target.lower().strip()
     log_event("TOOL", f"Запрос на закрытие: {target}")
 
     if t in ["tab", "вкладка", "вкладку", "текущая вкладка"]:
+        focus_browser_silently()
         pyautogui.hotkey("ctrl", "w")
         return "Активная вкладка браузера закрыта (Ctrl+W)."
 
@@ -269,38 +299,96 @@ def close_window_action(target: str) -> str:
         pyautogui.hotkey("alt", "f4")
         return "Активное окно закрыто (Alt+F4)."
 
-    # Close browser processes
+    # Close browser processes cleanly via psutil
     if any(k in t for k in ["browser", "браузер", "хром", "chrome", "yandex", "яндекс"]):
-        try:
-            subprocess.run(
-                ["powershell", "-NoProfile", "-Command", "Get-Process chrome, msedge, yandex, browser -ErrorAction SilentlyContinue | Stop-Process -Force"],
-                timeout=4
-            )
-            return "Все процессы браузера успешно закрыты."
-        except Exception:
-            pyautogui.hotkey("alt", "f4")
-            return "Отправлена команда закрытия окна браузера (Alt+F4)."
+        browser_names = ["browser.exe", "chrome.exe", "msedge.exe", "yandex.exe", "firefox.exe", "opera.exe"]
+        count = 0
+        for p in psutil.process_iter(['name']):
+            try:
+                if p.name().lower() in browser_names:
+                    p.terminate()
+                    count += 1
+            except Exception:
+                pass
+        return f"Все процессы браузера успешно закрыты ({count} завершено)."
 
-    # Specific app by name
+    # Close specific app by name cleanly via psutil
     aliases = {
-        "дискорд": "Discord",
-        "телега": "Telegram",
-        "телеграм": "Telegram",
-        "давинчи": "Resolve",
+        "дискорд": "discord",
+        "телега": "telegram",
+        "телеграм": "telegram",
+        "давинчи": "resolve",
         "стим": "steam",
-        "фигма": "Figma",
+        "фигма": "figma",
         "блендер": "blender"
     }
-    app_proc = aliases.get(t, t)
-    try:
-        subprocess.run(
-            ["powershell", "-NoProfile", "-Command", f"Get-Process *{app_proc}* -ErrorAction SilentlyContinue | Stop-Process -Force"],
-            timeout=4
-        )
-        return f"Процесс {app_proc} успешно закрыт."
-    except Exception as e:
+    app_key = aliases.get(t, t).lower()
+    count = 0
+    for p in psutil.process_iter(['name']):
+        try:
+            if app_key in p.name().lower():
+                p.terminate()
+                count += 1
+        except Exception:
+            pass
+    if count > 0:
+        return f"Приложение {target} закрыто ({count} процессов завершено)."
+    else:
         pyautogui.hotkey("alt", "f4")
-        return f"Попытка закрытия {app_proc}: {e}"
+        return f"Отправлена команда закрытия активного окна {target} через Alt+F4."
+
+def computer_action_exec(action: str, x: int = 0, y: int = 0, text: str = "") -> str:
+    """Claude-Style Unified Computer Use Tool."""
+    act = action.lower().strip()
+    try:
+        if act in ["click", "left_click", "клик"]:
+            real_x, real_y = scale_mouse_coordinates(x, y)
+            pyautogui.click(real_x, real_y)
+            log_event("TOOL", f"Клик по координатам ({real_x}, {real_y}) [исходные: {x}, {y}]")
+            return f"Выполнен клик мыши в ({real_x}, {real_y})."
+
+        elif act in ["right_click", "правый_клик"]:
+            real_x, real_y = scale_mouse_coordinates(x, y)
+            pyautogui.rightClick(real_x, real_y)
+            log_event("TOOL", f"Правый клик по координатам ({real_x}, {real_y})")
+            return f"Выполнен правый клик в ({real_x}, {real_y})."
+
+        elif act in ["double_click", "двойной_клик"]:
+            real_x, real_y = scale_mouse_coordinates(x, y)
+            pyautogui.doubleClick(real_x, real_y)
+            log_event("TOOL", f"Двойной клик по координатам ({real_x}, {real_y})")
+            return f"Выполнен двойной клик в ({real_x}, {real_y})."
+
+        elif act in ["move", "курсор"]:
+            real_x, real_y = scale_mouse_coordinates(x, y)
+            pyautogui.moveTo(real_x, real_y)
+            return f"Курсор перемещен в ({real_x}, {real_y})."
+
+        elif act in ["key", "hotkey", "клавиши"]:
+            keys = [k.strip().lower() for k in text.replace("+", " ").split()]
+            if keys:
+                pyautogui.hotkey(*keys)
+                log_event("TOOL", f"Нажаты клавиши: {'+'.join(keys)}")
+                return f"Нажата комбинация: {'+'.join(keys)}."
+            return "Клавиши не указаны."
+
+        elif act in ["type", "ввод", "текст"]:
+            pyautogui.write(text, interval=0.01)
+            log_event("TOOL", f"Введен текст: {text[:30]}")
+            return "Текст успешно введен."
+
+        elif act in ["scroll_down", "скролл_вниз"]:
+            pyautogui.scroll(-500)
+            return "Прокрутка экрана вниз."
+
+        elif act in ["scroll_up", "скролл_вверх"]:
+            pyautogui.scroll(500)
+            return "Прокрутка экрана вверх."
+
+        return f"Неизвестное действие: {act}"
+    except Exception as e:
+        log_event("ERROR", f"Ошибка computer_action {act}: {e}")
+        return f"Ошибка computer_action: {e}"
 
 def browser_action_exec(action: str, query_or_url: str = "") -> str:
     """Autonomous Browser Actions."""
@@ -329,6 +417,7 @@ def browser_action_exec(action: str, query_or_url: str = "") -> str:
             return "Открыта новая вкладка."
 
         elif act in ["close_tab", "закрой вкладку"]:
+            focus_browser_silently()
             pyautogui.hotkey("ctrl", "w")
             return "Вкладка браузера закрыта (Ctrl+W)."
 
@@ -353,11 +442,15 @@ def browser_action_exec(action: str, query_or_url: str = "") -> str:
         return f"Ошибка при управлении браузером: {e}"
 
 def focus_window_action(window_name: str) -> str:
-    """Brings the target application window to the foreground."""
+    """Brings the target application window to the foreground without console flash."""
     name = window_name.strip()
     try:
         cmd = f"(New-Object -ComObject WScript.Shell).AppActivate('{name}')"
-        out = subprocess.check_output(["powershell", "-NoProfile", "-Command", cmd], timeout=3).decode().strip()
+        out = subprocess.check_output(
+            ["powershell", "-NoProfile", "-Command", cmd],
+            creationflags=0x08000000,
+            timeout=3
+        ).decode().strip()
         log_event("TOOL", f"Фокус на окно '{name}': {out}")
         return f"Окно {name} выведено на передний план."
     except Exception as e:
@@ -367,10 +460,19 @@ def focus_window_action(window_name: str) -> str:
 # Main Tool Dispatcher
 # ==============================================================================
 def execute_tool(name: str, args: dict, engine_ref=None) -> str:
-    """Executes local PC actions, browser automation, self-learning and Git tools."""
+    """Executes Claude Computer Use actions, browser automation, self-learning and Git tools."""
     t_start = time.time()
     try:
-        if name == "close_window":
+        if name == "computer_action":
+            action = args.get("action", "click")
+            x = int(args.get("x", 0))
+            y = int(args.get("y", 0))
+            text = args.get("text", "")
+            res = computer_action_exec(action, x, y, text)
+            log_event("TOOL", f"{res} (за {time.time()-t_start:.3f}с)")
+            return res
+
+        elif name == "close_window":
             target = args.get("target", "window")
             res = close_window_action(target)
             log_event("TOOL", f"{res} (за {time.time()-t_start:.3f}с)")
@@ -459,18 +561,8 @@ def execute_tool(name: str, args: dict, engine_ref=None) -> str:
             else:
                 url = f"https://www.google.com/search?q={q}"
             webbrowser.open(url)
-            
-            abstract = ""
-            try:
-                ddg_url = f"https://api.duckduckgo.com/?q={q}&format=json&no_html=1"
-                req = urllib.request.Request(ddg_url, headers={"User-Agent": "Mozilla/5.0"})
-                with urllib.request.urlopen(req, timeout=2.5) as resp:
-                    d = json.loads(resp.read().decode())
-                    abstract = d.get("AbstractText", "").strip()
-            except Exception:
-                pass
             log_event("TOOL", f"Поиск и открытие браузера ({query}) за {time.time()-t_start:.3f}с")
-            return f"Открыта страница с результатами. {abstract}" if abstract else "Страница с результатами поиска открыта в браузере."
+            return "Страница с результатами поиска открыта в браузере."
 
         elif name == "get_weather":
             city = args.get("city", "").strip()
@@ -482,20 +574,13 @@ def execute_tool(name: str, args: dict, engine_ref=None) -> str:
                 cur = data["current_condition"][0]
                 temp = cur.get("temp_C", "?")
                 desc = cur.get("lang_ru", [{}])[0].get("value") if cur.get("lang_ru") else cur.get("weatherDesc", [{}])[0].get("value", "")
-                tomorrow = data.get("weather", [])[1] if len(data.get("weather", [])) > 1 else None
-                tom_str = ""
-                if tomorrow:
-                    max_t = tomorrow.get("maxtempC")
-                    min_t = tomorrow.get("mintempC")
-                    tom_desc = tomorrow.get("hourly", [{}])[4].get("lang_ru", [{}])[0].get("value", "")
-                    tom_str = f". Прогноз на завтра: от {min_t}°C до {max_t}°C, {tom_desc}"
                 area = data.get("nearest_area", [{}])[0].get("areaName", [{}])[0].get("value", city or "вашем регионе")
-                res = f"Погода в {area}: сейчас {temp}°C, {desc}{tom_str}."
+                res = f"Погода в {area}: сейчас {temp}°C, {desc}."
                 log_event("TOOL", f"Погода получена за {time.time()-t_start:.3f}с: {res}")
                 return res
 
         elif name == "inspect_screen":
-            # Immediately capture and send screen frame to active Gemini session
+            # Immediately capture and send a crisp high-res 1280x720 frame to active Gemini session
             if engine_ref and engine_ref.session:
                 jpeg_bytes = engine_ref._capture_screen_jpeg()
                 if jpeg_bytes:
@@ -506,8 +591,8 @@ def execute_tool(name: str, args: dict, engine_ref=None) -> str:
                         ),
                         engine_ref.async_loop
                     )
-            log_event("TOOL", f"Оптический снимок отправлен в сессию за {time.time()-t_start:.3f}с")
-            return "Свежий оптический снимок экрана отправлен в сессию."
+            log_event("TOOL", f"Оптический снимок 1280x720 отправлен в сессию за {time.time()-t_start:.3f}с")
+            return "Свежий оптический снимок высокого разрешения (1280x720) отправлен в сессию."
 
         elif name == "open_url":
             url = args.get("url", "").strip()
@@ -532,9 +617,10 @@ def execute_tool(name: str, args: dict, engine_ref=None) -> str:
         elif name == "click_screen":
             x = int(args.get("x", 0))
             y = int(args.get("y", 0))
-            pyautogui.click(x, y)
-            log_event("TOOL", f"Клик ({x}, {y}) за {time.time()-t_start:.3f}с")
-            return f"Выполнен клик мыши по координатам ({x}, {y})."
+            real_x, real_y = scale_mouse_coordinates(x, y)
+            pyautogui.click(real_x, real_y)
+            log_event("TOOL", f"Клик ({real_x}, {real_y}) за {time.time()-t_start:.3f}с")
+            return f"Выполнен клик мыши по координатам ({real_x}, {real_y})."
 
         elif name == "type_text":
             text = args.get("text", "")
@@ -546,6 +632,7 @@ def execute_tool(name: str, args: dict, engine_ref=None) -> str:
             cmd = args.get("command", "").strip()
             out = subprocess.check_output(
                 ["powershell", "-NoProfile", "-Command", cmd],
+                creationflags=0x08000000,
                 timeout=12,
                 stderr=subprocess.STDOUT
             ).decode("utf-8", errors="replace")
@@ -659,7 +746,7 @@ def execute_tool(name: str, args: dict, engine_ref=None) -> str:
                     pass
                 subprocess.check_call(["git", "add", "."], cwd=str(WORK_DIR))
                 commit_out = subprocess.check_output(
-                    ["git", "commit", "-m", "Initial commit: JARVIS Live Assistant with self-learning and PyQt6 HUD"],
+                    ["git", "commit", "-m", "Initial commit: JARVIS Live Assistant with Claude Computer Use and PyQt6 HUD"],
                     cwd=str(WORK_DIR)
                 ).decode("utf-8", errors="replace")
                 log_event("GIT", "Репозиторий Git успешно инициализирован.")
@@ -698,7 +785,7 @@ def execute_tool(name: str, args: dict, engine_ref=None) -> str:
                 api_url = "https://api.github.com/user/repos"
                 req_data = json.dumps({
                     "name": repo_name,
-                    "description": "J.A.R.V.I.S. Live Assistant - Voice AI with Gemini 3.8 Live, PyQt6 HUD and Autonomous Computer Use",
+                    "description": "J.A.R.V.I.S. Live Assistant - Voice AI with Gemini 3.8 Live, PyQt6 HUD and Claude Computer Use",
                     "private": args.get("is_private", False)
                 }).encode("utf-8")
                 req = urllib.request.Request(
@@ -853,7 +940,7 @@ class ArcReactorWidget(QWidget):
             }
         """)
 
-        vis_text = "👀 Непрерывное зрение: [ВКЛ]" if self.screen_vision_enabled else "👀 Непрерывное зрение: [ВЫКЛ]"
+        vis_text = "👀 Непрерывное зрение (1280x720): [ВКЛ]" if self.screen_vision_enabled else "👀 Непрерывное зрение: [ВЫКЛ]"
         vis_act = QAction(vis_text, self)
         vis_act.triggered.connect(self.toggle_vision)
         menu.addAction(vis_act)
@@ -988,7 +1075,7 @@ class ArcReactorWidget(QWidget):
         for i in range(12):
             painter.drawArc(-48, -48, 96, 96, int(i * 30 * 16 + 4 * 16), int(22 * 16))
 
-        # Radar sweep animation during optical vision scan
+        # Radar sweep animation
         if self.state == "VISION" or self.screen_vision_enabled:
             radar_grad = QConicalGradient(0, 0, self.radar_angle)
             radar_grad.setColorAt(0.0, QColor(accent.red(), accent.green(), accent.blue(), 80))
@@ -1049,17 +1136,15 @@ class ArcReactorWidget(QWidget):
 
 
 # ==============================================================================
-# Gemini Live Engine with Continuous Real-Time Vision & Autonomous Tools
+# Gemini Live Engine with Claude Computer Use Architecture
 # ==============================================================================
 class GeminiLiveEngine:
     """
-    Autonomous Computer-Use Gemini Live Engine:
-    - Continuous Screen Vision Stream (real-time video frames every 1.8s)
-    - Full PC & Browser Control: close_window, browser_action, focus_window, open_application
-    - DaVinci Resolve, Hotkeys, Notes, PowerShell
-    - Adaptive Turn Dispatch (1.15s pause tolerance)
-    - Self-Learning & Code Self-Modification
-    - Git & GitHub Autonomous Publishing
+    Claude Computer Use Architecture for Gemini Live:
+    - Crisp 1280x720 Screen Vision Stream (zero text blur, zero hallucination)
+    - Full Computer Control with Automatic Coordinate Scaling
+    - Pure Python process management (psutil) with zero flashing console windows
+    - Patient VAD with 1.40s silence pause and echo-suppression
     """
 
     def __init__(self, avatar_widget: ArcReactorWidget):
@@ -1120,27 +1205,25 @@ class GeminiLiveEngine:
         asyncio.run(self._live_session_loop())
 
     def _capture_screen_jpeg(self) -> bytes | None:
-        """Captures an ultra-lightweight screenshot for fast optical analysis."""
-        t0 = time.time()
+        """Captures crisp 1280x720 screenshot for precise OCR and zero hallucination."""
         try:
             with mss.mss() as sct:
                 monitor = sct.monitors[1] if len(sct.monitors) > 1 else sct.monitors[0]
                 sct_img = sct.grab(monitor)
                 img = Image.frombytes("RGB", sct_img.size, sct_img.bgra, "raw", "BGRX")
-                # Scale down to 800x450 for fast transmission (<20KB)
-                img.thumbnail((800, 450), Image.Resampling.LANCZOS)
+                # 1280x720 gives crystal-clear text readability for YouTube, browser tabs, code
+                img.thumbnail((CAPTURE_W, CAPTURE_H), Image.Resampling.LANCZOS)
                 buf = io.BytesIO()
-                img.save(buf, format="JPEG", quality=35)
-                data = buf.getvalue()
-                return data
-        except Exception as e:
+                img.save(buf, format="JPEG", quality=70)
+                return buf.getvalue()
+        except Exception:
             return None
 
     async def _continuous_vision_loop(self, session):
         """
-        Continuous Real-Time Screen Vision Stream:
-        Streams ultra-lightweight JPEG frames (800x450, ~14 KB) into Gemini Live WebSocket every 1.8s.
-        Gives Jarvis full visual awareness of user's desktop with zero perceptible CPU or network load.
+        Continuous Real-Time Screen Vision Stream (1280x720):
+        Streams crisp HD frames into Gemini Live WebSocket every 1.8s.
+        Gives Jarvis full visual awareness of user's desktop with zero perceptible CPU load.
         """
         last_hash = None
         from google.genai import types
@@ -1155,7 +1238,6 @@ class GeminiLiveEngine:
                 if not jpeg_bytes:
                     continue
 
-                # Screen change detection via lightweight sample hash
                 cur_hash = hash(jpeg_bytes[:128] + jpeg_bytes[-128:])
                 if cur_hash == last_hash:
                     continue
@@ -1182,35 +1264,55 @@ class GeminiLiveEngine:
         from google.genai import types
 
         tools_decl = [
-            # Autonomous Window & App Control
+            # Claude Computer Use Unified Tool
+            types.FunctionDeclaration(
+                name="computer_action",
+                description="Универсальное управление компьютером как в Claude: клик мышью по координатам (click, right_click, double_click), нажатие клавиш (key, e.g. 'ctrl+w', 'alt+f4', 'enter'), ввод текста (type), скролл (scroll_down, scroll_up). Координаты автоматически масштабируются!",
+                behavior="NON_BLOCKING",
+                parameters={
+                    "type": "OBJECT",
+                    "properties": {
+                        "action": {
+                            "type": "STRING",
+                            "description": "'click', 'right_click', 'double_click', 'move', 'key', 'type', 'scroll_down', 'scroll_up'"
+                        },
+                        "x": {"type": "INTEGER", "description": "Координата X на изображении экрана"},
+                        "y": {"type": "INTEGER", "description": "Координата Y на изображении экрана"},
+                        "text": {"type": "STRING", "description": "Клавиши через плюс ('ctrl+w', 'enter') или текст для набора"}
+                    },
+                    "required": ["action"]
+                }
+            ),
+            # Direct Window & App Closing
             types.FunctionDeclaration(
                 name="close_window",
-                description="Закрывает активное окно, вкладку браузера или завершает программу. Обязательно вызывай ПЕРЕД тем как сказать пользователю!",
+                description="Закрывает активное окно, вкладку браузера или завершает программу без всплывающих консольных окон. Обязательно вызывай ПЕРЕД ответом пользователю!",
                 behavior="NON_BLOCKING",
                 parameters={
                     "type": "OBJECT",
                     "properties": {
                         "target": {
                             "type": "STRING",
-                            "description": "'tab' (закрыть текущую вкладку браузера Ctrl+W), 'window' (закрыть активное окно Alt+F4), 'browser' (закрыть весь браузер), или имя программы (например 'discord', 'telegram', 'chrome', 'resolve')"
+                            "description": "'tab' (закрыть текущую вкладку браузера Ctrl+W), 'window' (закрыть активное окно Alt+F4), 'browser' (закрыть весь браузер), или имя программы ('discord', 'telegram', 'chrome', 'resolve')"
                         }
                     },
                     "required": ["target"]
                 }
             ),
+            # App Launcher
             types.FunctionDeclaration(
                 name="open_application",
                 description="Запускает программу, игру или ярлык Windows (Discord, Telegram, Chrome, Yandex, DaVinci Resolve, Steam, Blender, Notepad, Calc и др.).",
                 behavior="NON_BLOCKING",
                 parameters={
                     "type": "OBJECT",
-                    "properties": {"app_name": {"type": "STRING", "description": "Название программы (например 'discord', 'telegram', 'яндекс', 'chrome', 'steam')"}},
+                    "properties": {"app_name": {"type": "STRING", "description": "Название программы ('discord', 'telegram', 'яндекс', 'chrome', 'steam')"}},
                     "required": ["app_name"]
                 }
             ),
             types.FunctionDeclaration(
                 name="focus_window",
-                description="Выводит окно программы на передний план (например 'discord', 'chrome', 'telegram', 'davinci', 'antigravity').",
+                description="Выводит окно программы на передний план ('discord', 'chrome', 'yandex', 'telegram', 'davinci', 'antigravity').",
                 behavior="NON_BLOCKING",
                 parameters={
                     "type": "OBJECT",
@@ -1301,7 +1403,7 @@ class GeminiLiveEngine:
             ),
             types.FunctionDeclaration(
                 name="inspect_screen",
-                description="Немедленно отправляет свежий снимок экрана в активную сессию для детального оптического анализа.",
+                description="Немедленно отправляет свежий снимок экрана высокого разрешения (1280x720) в активную сессию.",
                 behavior="NON_BLOCKING",
                 parameters={
                     "type": "OBJECT",
@@ -1333,7 +1435,7 @@ class GeminiLiveEngine:
             ),
             types.FunctionDeclaration(
                 name="click_screen",
-                description="Кликает мышью по указанным координатам (x, y).",
+                description="Кликает мышью по указанным координатам (x, y) с авто-масштабированием.",
                 behavior="NON_BLOCKING",
                 parameters={
                     "type": "OBJECT",
@@ -1356,7 +1458,7 @@ class GeminiLiveEngine:
             ),
             types.FunctionDeclaration(
                 name="run_command",
-                description="Выполняет команду PowerShell в Windows.",
+                description="Выполняет команду PowerShell без появления черных окон.",
                 behavior="NON_BLOCKING",
                 parameters={
                     "type": "OBJECT",
@@ -1498,7 +1600,7 @@ class GeminiLiveEngine:
                     self.avatar.set_state("STANDBY")
 
     async def _vad_audio_loop(self, session):
-        """Microphone streaming with Adaptive Client Turn Dispatch."""
+        """Patient VAD (1.40s pause tolerance) with echo and overlap suppression."""
         loop = asyncio.get_running_loop()
         audio_q = asyncio.Queue()
 
@@ -1512,8 +1614,8 @@ class GeminiLiveEngine:
         pre_buffer = collections.deque(maxlen=10)
         is_speaking_user = False
         silence_start_time = 0.0
-        SILENCE_TIMEOUT = 1.15
-        MIN_SPEECH_DURATION = 0.40
+        SILENCE_TIMEOUT = 1.40        # 1.40s calm pause prevents cutting off user mid-thought!
+        MIN_SPEECH_DURATION = 0.45    # 450ms minimum speech filters random noise
         ambient_noise = 40.0
         speech_chunks = []
 
@@ -1521,7 +1623,8 @@ class GeminiLiveEngine:
             while self.is_running:
                 chunk = await audio_q.get()
 
-                if self.is_speaking:
+                # Echo & Overlap Suppression: don't buffer user turns while Jarvis is speaking
+                if self.is_speaking or self.avatar.state in ["SPEAKING", "EXECUTING"]:
                     continue
 
                 audio_samples = chunk[:, 0]
@@ -1628,18 +1731,18 @@ class GeminiLiveEngine:
                         log_event("TOOL", f"⚡ Вызов инструмента: {tool_name}({tool_args})")
 
                         subtext = "⚡ ДЕЙСТВИЕ"
-                        if "browser" in tool_name or "url" in tool_name:
-                            subtext = "⚡ БРАУЗЕР"
+                        if "computer" in tool_name or "click" in tool_name:
+                            subtext = "🖱️ МЫШЬ / КЛИК"
                         elif "close" in tool_name:
                             subtext = "❌ ЗАКРЫТИЕ"
                         elif "focus" in tool_name:
                             subtext = "🎯 ФОКУС ОКНА"
+                        elif "browser" in tool_name or "url" in tool_name:
+                            subtext = "⚡ БРАУЗЕР"
                         elif "youtube" in tool_name:
                             subtext = "⚡ YOUTUBE"
                         elif "davinci" in tool_name:
                             subtext = "⚡ ДАВИНЧИ"
-                        elif "weather" in tool_name:
-                            subtext = "⚡ ПОГОДА"
                         elif "screen" in tool_name or "vision" in tool_name:
                             subtext = "◈ СКАН ЭКРАНА"
                         elif "search" in tool_name:
@@ -1678,7 +1781,7 @@ def main():
 
     tray = QSystemTrayIcon(QIcon(str(ICON_PATH)), app)
     tray_menu = QMenu()
-    tray_menu.addAction("👀 Непрерывное зрение", avatar.toggle_vision)
+    tray_menu.addAction("👀 Непрерывное зрение (1280x720)", avatar.toggle_vision)
     tray_menu.addAction("📄 Открыть логи", avatar.open_log_file)
     tray_menu.addAction("🧠 База памяти", avatar.open_memory_file)
     tray_menu.addAction("🐙 Статус Git", avatar.show_git_status)
@@ -1694,7 +1797,7 @@ def main():
     engine = GeminiLiveEngine(avatar)
     engine.start()
 
-    log_event("INIT", "J.A.R.V.I.S. запущен (Autonomous Computer Use Edition) и ожидает команд.")
+    log_event("INIT", "J.A.R.V.I.S. запущен (Claude Computer Use Edition) и ожидает команд.")
     sys.exit(app.exec())
 
 

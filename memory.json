@@ -14,6 +14,16 @@
       "id": 3,
       "category": "предпочтения",
       "rule": "Всегда открывать страницу Яндекса в браузере."
+    },
+    {
+      "id": 4,
+      "category": "preferences",
+      "rule": "Do not open the Yandex tab automatically when starting the browser."
+    },
+    {
+      "id": 5,
+      "category": "preferences",
+      "rule": "Use Yandex browser instead of Chrome."
     }
   ],
   "user_preferences": {
