@@ -1,0 +1,17 @@
+# Virtual environment
+.venv/
+env/
+venv/
+
+# Secrets & Configs with API Keys
+config.json
+
+# Python bytecode & cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.bak
+
+# Logs & temp files
+*.log
+*.tmp

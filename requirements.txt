@@ -1,0 +1,8 @@
+google-genai>=2.3.0
+websockets>=14.0
+sounddevice>=0.5.0
+numpy>=1.26.0
+mss>=9.0.0
+pillow>=10.0.0
+PyQt6>=6.6.0
+pyautogui>=0.9.54

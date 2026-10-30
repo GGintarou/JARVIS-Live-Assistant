@@ -1,0 +1,22 @@
+{
+  "learned_rules": [
+    {
+      "id": 1,
+      "category": "контекст",
+      "rule": "Слово «Антигравитация» (Antigravity) означает среду разработки кода на компьютере пользователя, а не физическую левитацию."
+    },
+    {
+      "id": 2,
+      "category": "поведение",
+      "rule": "Если пользователь передумал на полуслове или сказал «нет, лучше...», выполнять только финальный вариант."
+    }
+  ],
+  "user_preferences": {
+    "preferred_browser": "default",
+    "communication_style": "уверенный, лаконичный Джарвис"
+  },
+  "github_config": {
+    "repo_name": "JARVIS-Live-Assistant",
+    "remote_url": ""
+  }
+}
