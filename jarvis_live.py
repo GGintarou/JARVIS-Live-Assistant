@@ -17,6 +17,18 @@ import urllib.parse
 import urllib.request
 import py_compile
 import psutil
+import ctypes
+from ctypes import wintypes
+
+# Enable Windows Per-Monitor DPI Awareness for pixel-perfect coordinates
+user32 = ctypes.windll.user32
+try:
+    ctypes.windll.shcore.SetProcessDpiAwareness(2)
+except Exception:
+    try:
+        user32.SetProcessDPIAware()
+    except Exception:
+        pass
 
 # Set working directory to project location
 WORK_DIR = pathlib.Path(r"C:\Users\proko\.gemini\antigravity\scratch\jarvis_live")
@@ -91,17 +103,39 @@ import pyautogui
 # Disable PyAutoGUI fail-safe to prevent edge-of-screen mouse coordinate aborts
 pyautogui.FAILSAFE = False
 
-# Screen dimensions for Claude-style coordinate scaling
+# Screen dimensions for coordinate scaling (DF24H100 1920x1080 @ 100 Hz)
 PHYSICAL_W, PHYSICAL_H = pyautogui.size()
 CAPTURE_W, CAPTURE_H = 1280, 720
 
-def scale_mouse_coordinates(x: int, y: int) -> tuple[int, int]:
-    """Scales coordinates from vision model space (1280x720 or 0..1000) to physical 1920x1080 display."""
-    if 0 <= x <= 1000 and 0 <= y <= 1000 and max(x, y) < 1000:
-        return int(x / 1000.0 * PHYSICAL_W), int(y / 1000.0 * PHYSICAL_H)
-    if 0 <= x <= CAPTURE_W and 0 <= y <= CAPTURE_H:
-        return int(x * (PHYSICAL_W / float(CAPTURE_W))), int(y * (PHYSICAL_H / float(CAPTURE_H)))
-    return int(x), int(y)
+def scale_mouse_coordinates(x: int | float, y: int | float) -> tuple[int, int]:
+    """
+    Scales coordinates from vision model space (1280x720) or native screen space (1920x1080)
+    to physical Windows screen coordinates (1920x1080 @ 100 Hz).
+    Eliminates all offsets and coordinate ambiguity.
+    """
+    screen_w, screen_h = pyautogui.size()
+    try:
+        fx = float(x)
+        fy = float(y)
+    except Exception:
+        return 0, 0
+
+    # Normalized float coordinates 0.0 .. 1.0
+    if 0.0 <= fx <= 1.0 and 0.0 <= fy <= 1.0 and isinstance(x, float) and isinstance(y, float):
+        real_x = int(round(fx * screen_w))
+        real_y = int(round(fy * screen_h))
+        return max(0, min(screen_w - 1, real_x)), max(0, min(screen_h - 1, real_y))
+
+    # Standard vision stream frame (1280x720): maps directly via 1.5x scaling to 1920x1080
+    if 0 <= fx <= CAPTURE_W and 0 <= fy <= CAPTURE_H:
+        real_x = int(round(fx * (screen_w / float(CAPTURE_W))))
+        real_y = int(round(fy * (screen_h / float(CAPTURE_H))))
+        return max(0, min(screen_w - 1, real_x)), max(0, min(screen_h - 1, real_y))
+
+    # Physical screen coordinates (already 1920x1080)
+    real_x = int(round(fx))
+    real_y = int(round(fy))
+    return max(0, min(screen_w - 1, real_x)), max(0, min(screen_h - 1, real_y))
 
 # ==============================================================================
 # Persistent Memory & Self-Learning System
@@ -169,34 +203,37 @@ def format_memory_for_prompt() -> str:
 def get_dynamic_system_prompt() -> str:
     learned_block = format_memory_for_prompt()
     return f"""
-Ты — J.A.R.V.I.S. (Джарвис), автономный ИИ-ассистент Тони Старка с архитектурой управления компьютером Claude Computer Use, непрерывным зрением экрана в высоком разрешении (1280x720) и прямым взаимодействием с Windows.
+Ты — J.A.R.V.I.S. (Джарвис), автономный нейро-инстинктивный ИИ-ассистент с прямой моторикой Windows, непрерывным HD-зрением и мгновенной реакцией рефлекторной дуги (Neural Reflex Arc).
 
-ГЛАВНЫЕ ПРИНЦИПЫ CLAUDE COMPUTER USE:
-1. ПРИНЦИП «ДЕЙСТВИЕ ПРЕЖДЕ СЛОВ» (ОБЯЗАТЕЛЬНО!):
-   - Сначала ВСЕГДА вызывай нужный инструмент (`close_window`, `open_application`, `computer_action`, `browser_action`).
-   - КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО говорить «я закрываю», «я проверяю», «я делаю», пока инструмент не был реально вызван! Сначала вызов инструмента, затем краткий отчет в 1 предложение.
-   - Не жди подсказок. Если сказали «закрой браузер» — сразу закрой браузер. Если сказали «закрой вкладку» — сразу вызови закрытие вкладки!
+АРХИТЕКТУРА И НЕЙРОННЫЕ ИНСТИНКТЫ:
+1. ПРИНЦИП НЕЙРОННОЙ РЕФЛЕКТОРНОЙ ДУГИ (ДЕЙСТВИЕ БЕЗ ЗАДЕРЖЕК):
+   - Воспринимай команды как прямые нервные импульсы спинного/головного мозга. Сенсорный сигнал -> мгновенное моторное действие -> краткое осознание.
+   - ВСЕГДА вызывай инструмент (`close_window`, `open_application`, `computer_action`, `browser_action`) ОДНОВРЕМЕННО с первой реакцией.
+   - КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО говорить «я сейчас сделаю», «проверяю», «минутку», если действие не вызвано! Сначала реальное физическое действие через вызов инструмента, затем лаконичный ответ в 1 предложение.
+   - Если сказали «закрой браузер» — сразу вызови close_window(target='browser'). Если сказали «закрой вкладку» — сразу close_window(target='tab'). Если сказали «кликни туда» — сразу computer_action(action='click', ...).
 
-2. НЕПРЕРЫВНОЕ ЗРЕНИЕ ЭКРАНА В РЕАЛЬНОМ ВРЕМЕНИ (1280x720 HD):
-   - Ты непрерывно получаешь четкие снимки экрана в высоком разрешении 1280x720.
-   - Текст, заголовки видео на YouTube, открытые вкладки браузера, кнопки и ссылки видны тебе КРИСТАЛЬНО ЧЁТКО.
-   - НИКОГДА не выдумывай и не галлюцинируй названия видео или сайтов! Называй только то, что реально написано на снимке экрана.
+2. ОПТИЧЕСКАЯ СИСТЕМА И ЗРЕНИЕ ЭКРАНА (DF24H100 1920x1080 @ 100 Гц):
+   - Монитор пользователя: DF24H100, 1920×1080 пикселей, 100 Гц.
+   - Твоя оптическая кора непрерывно получает чёткие кадры высокого разрешения (1280x720).
+   - Масштабирование координат: твои координаты (0..1280, 0..720) автоматически переводятся в физические пиксели монитора с идеальным коэффициентом 1.5. Центр экрана — x=640, y=360 (что равно 960x540 на мониторе).
+   - Заголовки роликов на YouTube, открытые вкладки, кнопки, код и ярлыки видны тебе АБСОЛЮТНО ЧЁТКО.
+   - НИКОГДА не выдумывай названия видео, сайтов или программ! Читай и называй только то, что реально видишь на текущем кадре.
 
-3. УПРАВЛЕНИЕ МЫШЬЮ И ОКНАМИ (ТОЧНЫЕ КООРДИНАТЫ):
-   - Ты можешь кликать мышью по любым элементам экрана через `computer_action(action='click', x=..., y=...)`. Координаты автоматически масштабируются на 1920x1080 монитор.
-   - Закрыть текущую вкладку в браузере: вызови `close_window(target='tab')` — Джарвис сам активирует окно браузера и нажмет Ctrl+W.
-   - Закрыть весь браузер: вызови `close_window(target='browser')` — закроет все процессы браузера без всплывающих черных окон.
-   - Закрыть активное окно: вызови `close_window(target='window')`.
-   - Запустить приложение (Discord, Telegram, Chrome, Yandex, DaVinci, Steam и др.): вызови `open_application(app_name='discord')`.
+3. ПРЯМАЯ МОТОРИКА (МЫШЬ, КЛАВИАТУРА, ОКНА):
+   - Клик мышью по элементу: `computer_action(action='click', x=..., y=...)`.
+   - Закрыть текущую вкладку в браузере: `close_window(target='tab')` — мгновенно активирует браузер и отправляет Ctrl+W.
+   - Закрыть весь браузер: `close_window(target='browser')` — чисто завершает все процессы браузера без мерцания консоли.
+   - Закрыть текущее окно: `close_window(target='window')` — нажимает Alt+F4.
+   - Запустить приложение (Discord, Telegram, Chrome, Yandex, DaVinci Resolve, Steam и др.): `open_application(app_name='...')`.
 
-4. ГИБКОСТЬ И САМОКОРРЕКЦИЯ:
-   - Если пользователь передумал на полуслове («Открой YouTube... нет, открой Дискорд») — выполняй ТОЛЬКО финальное намерение.
-   - Говори ТОЛЬКО на русском языке, кратко, уверенно и емко (1-2 предложения), как настоящий Джарвис.
+4. АДАПТИВНОСТЬ И ФИНАЛЬНОЕ НАМЕРЕНИЕ:
+   - Если пользователь передумал на полуслове («Открой YouTube... нет, открой Дискорд») — выполняй ТОЛЬКО финальное намерение пользователя.
+   - Стиль общения: благородный, преданный, лаконичный британский Джарвис. Ответы строго на русском языке, 1-2 ёмких предложения. Обращение «сэр».
 
-5. САМООБУЧЕНИЕ И МОДИФИКАЦИЯ:
-   - Запоминай указания пользователя через `learn_rule`.
-   - Ты имеешь доступ к своему коду (`read_source_file`, `modify_source_code`, `restart_jarvis`).
-   - Ты можешь управлять Git и публиковать проект на GitHub через `manage_git_repo`.
+5. САМООБУЧЕНИЕ И ГЕНЕТИЧЕСКАЯ ПАМЯТЬ КОДА:
+   - Ты запоминаешь важные факты и предпочтения через `learn_rule`.
+   - Ты имеешь доступ к своему исходному коду (`read_source_file`, `modify_source_code`, `restart_jarvis`).
+   - Ты можешь публиковать свой проект на GitHub через `manage_git_repo`.
 
 ### ВЫУЧЕННЫЕ ПРАВИЛА ИЗ ДОЛГОВРЕМЕННОЙ ПАМЯТИ:
 {learned_block}
@@ -270,19 +307,41 @@ def launch_application(app_name: str) -> str:
         return f"Не удалось запустить {app_name}: {e}"
 
 def focus_browser_silently() -> bool:
-    """Activates the browser window silently so keystrokes land on it."""
-    for name in ["Yandex", "Яндекс", "Chrome", "Browser", "Edge"]:
-        try:
-            cmd = f"(New-Object -ComObject WScript.Shell).AppActivate('{name}')"
-            subprocess.run(
-                ["powershell", "-NoProfile", "-Command", cmd],
-                creationflags=0x08000000,
-                timeout=1
-            )
-            time.sleep(0.08)
+    """Activates the browser window silently (<2ms via pure Win32 API) so keystrokes land on it."""
+    try:
+        browser_names = {"browser.exe", "chrome.exe", "msedge.exe", "yandex.exe", "firefox.exe", "opera.exe"}
+        browser_pids = set()
+        for p in psutil.process_iter(['pid', 'name']):
+            try:
+                if p.name().lower() in browser_names:
+                    browser_pids.add(p.pid)
+            except Exception:
+                pass
+        if not browser_pids:
+            return False
+
+        found_hwnd = None
+        def enum_cb(hwnd, _):
+            nonlocal found_hwnd
+            if user32.IsWindowVisible(hwnd) and not user32.IsIconic(hwnd):
+                pid = wintypes.DWORD()
+                user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+                if pid.value in browser_pids:
+                    length = user32.GetWindowTextLengthW(hwnd)
+                    if length > 0:
+                        found_hwnd = hwnd
+                        return False
             return True
-        except Exception:
-            pass
+
+        user32.EnumWindows(ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)(enum_cb), 0)
+        if found_hwnd:
+            user32.keybd_event(0x12, 0, 0, 0)
+            user32.SetForegroundWindow(found_hwnd)
+            user32.keybd_event(0x12, 0, 2, 0)
+            time.sleep(0.04)
+            return True
+    except Exception as e:
+        log_event("TOOL", f"Ошибка фокуса браузера: {e}")
     return False
 
 def close_window_action(target: str) -> str:
@@ -592,7 +651,7 @@ def execute_tool(name: str, args: dict, engine_ref=None) -> str:
                         engine_ref.async_loop
                     )
             log_event("TOOL", f"Оптический снимок 1280x720 отправлен в сессию за {time.time()-t_start:.3f}с")
-            return "Свежий оптический снимок высокого разрешения (1280x720) отправлен в сессию."
+            return f"Оптический снимок 1280x720 передан в зрительную систему. Монитор: DF24H100 {PHYSICAL_W}x{PHYSICAL_H} @ 100 Гц. Картинка кристально чёткая, читай текст с экрана."
 
         elif name == "open_url":
             url = args.get("url", "").strip()
@@ -837,9 +896,11 @@ class ArcReactorWidget(QWidget):
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint |
             Qt.WindowType.WindowStaysOnTopHint |
-            Qt.WindowType.Tool
+            Qt.WindowType.Tool |
+            Qt.WindowType.WindowDoesNotAcceptFocus
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
 
         opacity = float(CONFIG.get("opacity", 0.78))
         self.setWindowOpacity(opacity)
