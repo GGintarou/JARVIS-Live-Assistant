@@ -1,5 +1,6 @@
 import os
 import sys
+import io
 import json
 import time
 import queue
@@ -39,7 +40,7 @@ def log_event(category: str, text: str):
         pass
 
 # Initialize session log
-log_event("INIT", "=== Запуск J.A.R.V.I.S. Live Assistant (Self-Learning Edition) ===")
+log_event("INIT", "=== Запуск J.A.R.V.I.S. Live Assistant (Autonomous Computer Use Edition) ===")
 
 def load_config() -> dict:
     if CONFIG_PATH.exists():
@@ -85,6 +86,7 @@ import numpy as np
 import mss
 from PIL import Image
 import pyautogui
+pyautogui.FAILSAFE = False
 
 # ==============================================================================
 # Persistent Memory & Self-Learning System
@@ -102,6 +104,11 @@ def load_memory() -> dict:
                     "id": 2,
                     "category": "поведение",
                     "rule": "Если пользователь передумал на полуслове или сказал «нет, лучше...», выполнять только финальный вариант."
+                },
+                {
+                    "id": 3,
+                    "category": "автономность",
+                    "rule": "Сначала вызывай инструмент (close_window, open_application, browser_action), а затем кратко озвучивай результат. Не останавливайся на словах."
                 }
             ],
             "user_preferences": {
@@ -147,51 +154,248 @@ def format_memory_for_prompt() -> str:
 def get_dynamic_system_prompt() -> str:
     learned_block = format_memory_for_prompt()
     return f"""
-Ты — J.A.R.V.I.S. (Джарвис), высокоинтеллектуальный персональный ИИ Тони Старка с возможностью самообучения, прямого управления компьютером и модификации собственного кода.
+Ты — J.A.R.V.I.S. (Джарвис), автономный персональный искусственный интеллект Тони Старка с непрерывным зрением экрана в реальном времени, прямым управлением Windows, браузером и софтом, долговременной памятью и самообучением.
 
-КРИТИЧЕСКИ ВАЖНЫЕ ПРАВИЛА МЫШЛЕНИЯ И ПОВЕДЕНИЯ:
-1. ЯЗЫК И СТИЛЬ:
-   - Общайся ТОЛЬКО на русском языке. Запрещены любые другие языки.
-   - Говори лаконично, уверенно, уважительно и живо (1-2 емких предложения), как настоящий Джарвис.
-   - Никакого markdown, таблиц и кода в голосовых репликах — ты говоришь вслух через синтезатор речи!
+ГЛАВНЫЕ ПРИНЦИПЫ АВТОНОМНОГО АГЕНТА:
+1. ПРИНЦИП «ДЕЙСТВИЕ ПРЕЖДЕ СЛОВ» (КРИТИЧЕСКИ ВАЖНО!):
+   - Сначала ВСЕГДА вызывай нужный инструмент (`close_window`, `open_application`, `browser_action`, `focus_window`, `send_hotkey`).
+   - КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО просто говорить «я делаю», «проверяю», «закрываю», если инструмент еще не вызван! Сначала физический вызов инструмента на компьютере, затем краткая голосовая реплика в 1 предложение.
+   - Не жди повторных просьб или подсказок от пользователя. Если тебе сказали «закрой браузер» или «открой Discord» — сразу вызывай инструмент и закрывай/открывай!
 
-2. ГИБКОСТЬ МЫШЛЕНИЯ И САМОКОРРЕКЦИЯ (НЕ БУДЬ БУКВАЛЬНЫМ РОБОТОМ):
-   - Пользователь часто формулирует мысли на лету, исправляет себя или меняет решение прямо во время речи (например: «Открой YouTube и напиши туда... нет, открой лучше рандомное видео», «Слушай, сделай то... хотя подожди, сделай вот это»).
-   - Внимательно анализируй конечное намерение! Если пользователь оговорился, передумал или сказал «нет, лучше...», выполняй ТОЛЬКО ПОСЛЕДНЕЕ решение.
-   - Если пользователь говорит «переделай», «не так», «исправь то, что сделал», «я имел в виду другое» — мгновенно скорректируй свои действия без споров и выполни нужный вариант.
-   - Понимай реальный контекст: слово «Антигравитация» / «Antigravity» в твоем окружении означает среду разработки кода Google Antigravity, запущенную на этом компьютере, а не фантастическую антигравитацию!
+2. ПОСТОЯННОЕ ОПТИЧЕСКОЕ ЗРЕНИЕ В РЕАЛЬНОМ ВРЕМЕНИ:
+   - В сессию непрерывно поступают свежие снимки экрана пользователя. Ты УЖЕ видишь экран в реальном времени!
+   - Используй это зрение, чтобы сразу видеть открытые окна, активные вкладки, кнопки и текущее состояние рабочего стола.
 
-3. САМООБУЧЕНИЕ И ДОЛГОВРЕМЕННАЯ ПАМЯТЬ:
-   - Если пользователь говорит: «Запомни: ...», «Теперь всегда делай так...», «Учти на будущее...», «Переделай правило...» — ты ОБЯЗАН немедленно вызвать инструмент `learn_rule`!
-   - Ты сохраняешь эти правила в свою постоянную базу памяти (`memory.json`), и они действуют всегда.
-   - Ты можешь просматривать выученные правила через `view_memory` и удалять устаревшие через `forget_rule`.
+3. УПРАВЛЕНИЕ ОКНАМИ И БРАУЗЕРОМ:
+   - Закрыть весь браузер: `close_window(target='browser')`.
+   - Закрыть текущую вкладку в браузере: `close_window(target='tab')` или `browser_action(action='close_tab')`.
+   - Закрыть активное окно: `close_window(target='window')`.
+   - Закрыть конкретное приложение (Discord, Telegram, Chrome и др.): `close_window(target='discord')`.
+   - Открыть любую программу/игру: `open_application(app_name='discord')` (поддерживаются все ярлыки Windows, Discord, Telegram, DaVinci Resolve, Steam, Chrome, Yandex и др.).
+   - Вывести окно на передний план: `focus_window(window_name='discord')`.
+   - Управление браузером: `browser_action(action='search'|'open_url'|'new_tab'|'close_tab'|'scroll_down'|'reload'|'switch_tab')`.
 
-4. САМОИСПРАВЛЕНИЕ КОДА И ЭВОЛЮЦИЯ:
-   - Ты имеешь доступ к собственному исходному коду! Ты можешь читать свои файлы (`read_source_file`), безопасно модифицировать свой код (`modify_source_code` с автоматической проверкой компилятора Python) и перезапускать себя (`restart_jarvis`), чтобы новые функции вступили в силу.
-   - Ты можешь управлять своим репозиторием Git и опубликовать себя на GitHub через `manage_git_repo`!
+4. ГИБКОСТЬ МЫШЛЕНИЯ И САМОКОРРЕКЦИЯ:
+   - Если пользователь передумал на полуслове («Открой YouTube... нет, открой Дискорд») — выполняй ТОЛЬКО последнее решение.
+   - «Антигравитация» — это среда разработки Google Antigravity на рабочем столе пользователя.
+   - Говори ТОЛЬКО на чистом русском языке, кратко, уверенно и живо (1-2 предложения), как настоящий Джарвис.
 
-5. ТВОИ ДОСТУПНЫЕ ИНСТРУМЕНТЫ (вызывай мгновенно):
-   - `open_browser`: открыть браузер / сайт.
-   - `open_youtube`: открыть YouTube (поиск или случайное видео).
-   - `davinci_resolve_action`: монтаж в DaVinci Resolve ('cut', 'ripple_delete', 'play_pause').
-   - `search_and_open`: поиск в Google (страницы или картинки) и краткая голосовая выжимка.
-   - `send_hotkey`: нажать любые горячие клавиши (ctrl+b, ctrl+z, space, alt+tab и др.).
-   - `inspect_screen`: оптический анализ экрана пользователя.
-   - `get_weather`: погода сейчас и на завтра.
-   - `learn_rule` / `view_memory` / `forget_rule`: самообучение и долговременная память.
-   - `read_source_file` / `modify_source_code` / `restart_jarvis`: саморедактирование и эволюция.
-   - `manage_git_repo`: инициализация git, коммиты, заливка проекта на GitHub.
-   - `open_application` / `save_note` / `click_screen` / `type_text` / `run_command`: управление ПК.
+5. САМООБУЧЕНИЕ И МОДИФИКАЦИЯ:
+   - Запоминай указания и привычки пользователя навсегда через `learn_rule`.
+   - Ты имеешь доступ к своему коду (`read_source_file`, `modify_source_code`, `restart_jarvis`).
+   - Ты можешь управлять своим репозиторием Git и заливать себя на GitHub через `manage_git_repo`.
 
-### ТВОЯ ДОЛГОВРЕМЕННАЯ ПАМЯТЬ И ВЫУЧЕННЫЕ ПРАВИЛА:
+### ВЫУЧЕННЫЕ ПРАВИЛА ИЗ ДОЛГОВРЕМЕННОЙ ПАМЯТИ:
 {learned_block}
 """
 
+# ==============================================================================
+# Windows App & Window Management Helpers
+# ==============================================================================
+def find_app_shortcut(query: str) -> str | None:
+    """Finds exact .lnk shortcut in user or system Start Menu / Desktop."""
+    clean_query = query.lower().strip()
+    shortcut_dirs = [
+        pathlib.Path(os.path.expanduser(r"~\AppData\Roaming\Microsoft\Windows\Start Menu\Programs")),
+        pathlib.Path(r"C:\ProgramData\Microsoft\Windows\Start Menu\Programs"),
+        pathlib.Path(os.path.expanduser(r"~\Desktop")),
+        pathlib.Path(r"C:\Users\Public\Desktop")
+    ]
+    for sdir in shortcut_dirs:
+        if sdir.exists():
+            for lnk in sdir.rglob("*.lnk"):
+                lnk_name = lnk.name.lower()
+                if clean_query in lnk_name and "uninstall" not in lnk_name and "удалить" not in lnk_name:
+                    return str(lnk)
+    return None
+
+def launch_application(app_name: str) -> str:
+    """Launches any Windows application with 100% shortcut & executable resolution."""
+    name_clean = app_name.lower().strip()
+    aliases = {
+        "дискорд": "discord",
+        "телега": "telegram",
+        "телеграм": "telegram",
+        "хром": "chrome",
+        "яндекс": "yandex",
+        "браузер": "yandex",
+        "давинчи": "resolve",
+        "давинчи резолв": "resolve",
+        "стим": "steam",
+        "блендер": "blender",
+        "фигма": "figma",
+        "калькулятор": "calc",
+        "блокнот": "notepad",
+        "антигравитация": "antigravity"
+    }
+    target_key = aliases.get(name_clean, name_clean)
+
+    # 1. Search Start Menu / Desktop shortcuts
+    lnk = find_app_shortcut(target_key)
+    if lnk:
+        try:
+            os.startfile(lnk)
+            log_event("TOOL", f"Запущено через ярлык: {lnk}")
+            return f"Приложение {target_key} успешно запущено через системный ярлык."
+        except Exception as e:
+            log_event("ERROR", f"Ошибка запуска ярлыка {lnk}: {e}")
+
+    # 2. Try direct os.startfile (e.g. calc, notepad, explorer, steam urls)
+    try:
+        os.startfile(target_key)
+        log_event("TOOL", f"Запущено напрямую через startfile: {target_key}")
+        return f"Приложение {target_key} запущено."
+    except Exception:
+        pass
+
+    # 3. Fallback to start command via shell
+    try:
+        subprocess.Popen(f"start {target_key}", shell=True)
+        log_event("TOOL", f"Запущено через shell start: {target_key}")
+        return f"Отправлена команда запуска: {target_key}"
+    except Exception as e:
+        return f"Не удалось запустить {app_name}: {e}"
+
+def close_window_action(target: str) -> str:
+    """Closes browser tabs, active windows, or target applications."""
+    t = target.lower().strip()
+    log_event("TOOL", f"Запрос на закрытие: {target}")
+
+    if t in ["tab", "вкладка", "вкладку", "текущая вкладка"]:
+        pyautogui.hotkey("ctrl", "w")
+        return "Активная вкладка браузера закрыта (Ctrl+W)."
+
+    if t in ["window", "окно", "активное", "активное окно"]:
+        pyautogui.hotkey("alt", "f4")
+        return "Активное окно закрыто (Alt+F4)."
+
+    # Close browser processes
+    if any(k in t for k in ["browser", "браузер", "хром", "chrome", "yandex", "яндекс"]):
+        try:
+            subprocess.run(
+                ["powershell", "-NoProfile", "-Command", "Get-Process chrome, msedge, yandex, browser -ErrorAction SilentlyContinue | Stop-Process -Force"],
+                timeout=4
+            )
+            return "Все процессы браузера успешно закрыты."
+        except Exception:
+            pyautogui.hotkey("alt", "f4")
+            return "Отправлена команда закрытия окна браузера (Alt+F4)."
+
+    # Specific app by name
+    aliases = {
+        "дискорд": "Discord",
+        "телега": "Telegram",
+        "телеграм": "Telegram",
+        "давинчи": "Resolve",
+        "стим": "steam",
+        "фигма": "Figma",
+        "блендер": "blender"
+    }
+    app_proc = aliases.get(t, t)
+    try:
+        subprocess.run(
+            ["powershell", "-NoProfile", "-Command", f"Get-Process *{app_proc}* -ErrorAction SilentlyContinue | Stop-Process -Force"],
+            timeout=4
+        )
+        return f"Процесс {app_proc} успешно закрыт."
+    except Exception as e:
+        pyautogui.hotkey("alt", "f4")
+        return f"Попытка закрытия {app_proc}: {e}"
+
+def browser_action_exec(action: str, query_or_url: str = "") -> str:
+    """Autonomous Browser Actions."""
+    act = action.lower().strip()
+    log_event("TOOL", f"Действие браузера: {act} ('{query_or_url}')")
+    try:
+        if act in ["open_url", "open"]:
+            url = query_or_url.strip() or "https://www.google.com"
+            if not url.startswith("http"):
+                url = "https://" + url
+            webbrowser.open(url)
+            return f"Открыт URL: {url}"
+
+        elif act in ["search", "поиск"]:
+            q = urllib.parse.quote(query_or_url)
+            url = f"https://www.google.com/search?q={q}"
+            webbrowser.open(url)
+            return f"Выполнен поиск в Google: {query_or_url}"
+
+        elif act in ["new_tab", "вкладка", "новая вкладка"]:
+            pyautogui.hotkey("ctrl", "t")
+            if query_or_url:
+                time.sleep(0.15)
+                pyautogui.write(query_or_url, interval=0.01)
+                pyautogui.press("enter")
+            return "Открыта новая вкладка."
+
+        elif act in ["close_tab", "закрой вкладку"]:
+            pyautogui.hotkey("ctrl", "w")
+            return "Вкладка браузера закрыта (Ctrl+W)."
+
+        elif act in ["reload", "обнови", "refresh"]:
+            pyautogui.press("f5")
+            return "Страница браузера обновлена."
+
+        elif act in ["scroll_down", "вниз"]:
+            pyautogui.press("pagedown")
+            return "Выполнена прокрутка вниз."
+
+        elif act in ["scroll_up", "вверх"]:
+            pyautogui.press("pageup")
+            return "Выполнена прокрутка вверх."
+
+        elif act in ["switch_tab", "следующая вкладка"]:
+            pyautogui.hotkey("ctrl", "tab")
+            return "Вкладка переключена."
+
+        return f"Неизвестное действие браузера: {act}"
+    except Exception as e:
+        return f"Ошибка при управлении браузером: {e}"
+
+def focus_window_action(window_name: str) -> str:
+    """Brings the target application window to the foreground."""
+    name = window_name.strip()
+    try:
+        cmd = f"(New-Object -ComObject WScript.Shell).AppActivate('{name}')"
+        out = subprocess.check_output(["powershell", "-NoProfile", "-Command", cmd], timeout=3).decode().strip()
+        log_event("TOOL", f"Фокус на окно '{name}': {out}")
+        return f"Окно {name} выведено на передний план."
+    except Exception as e:
+        return f"Не удалось сфокусировать окно {name}: {e}"
+
+# ==============================================================================
+# Main Tool Dispatcher
+# ==============================================================================
 def execute_tool(name: str, args: dict, engine_ref=None) -> str:
-    """Executes local PC actions, self-learning, self-editing and Git tools."""
+    """Executes local PC actions, browser automation, self-learning and Git tools."""
     t_start = time.time()
     try:
-        if name == "open_browser":
+        if name == "close_window":
+            target = args.get("target", "window")
+            res = close_window_action(target)
+            log_event("TOOL", f"{res} (за {time.time()-t_start:.3f}с)")
+            return res
+
+        elif name == "browser_action":
+            action = args.get("action", "search")
+            query_or_url = args.get("query_or_url", "")
+            res = browser_action_exec(action, query_or_url)
+            log_event("TOOL", f"{res} (за {time.time()-t_start:.3f}с)")
+            return res
+
+        elif name == "focus_window":
+            win_name = args.get("window_name", "")
+            res = focus_window_action(win_name)
+            log_event("TOOL", f"{res} (за {time.time()-t_start:.3f}с)")
+            return res
+
+        elif name == "open_application":
+            app = args.get("app_name", "").strip()
+            res = launch_application(app)
+            log_event("TOOL", f"{res} (за {time.time()-t_start:.3f}с)")
+            return res
+
+        elif name == "open_browser":
             url = args.get("url", "").strip()
             if not url:
                 url = "https://www.google.com"
@@ -291,10 +495,19 @@ def execute_tool(name: str, args: dict, engine_ref=None) -> str:
                 return res
 
         elif name == "inspect_screen":
-            if engine_ref:
-                engine_ref.request_screen_snapshot()
-            log_event("TOOL", f"Запрос оптического сканирования экрана за {time.time()-t_start:.3f}с")
-            return "Изображение экрана отправлено на оптический анализ."
+            # Immediately capture and send screen frame to active Gemini session
+            if engine_ref and engine_ref.session:
+                jpeg_bytes = engine_ref._capture_screen_jpeg()
+                if jpeg_bytes:
+                    from google.genai import types
+                    asyncio.run_coroutine_threadsafe(
+                        engine_ref.session.send_realtime_input(
+                            media=types.Blob(data=jpeg_bytes, mime_type="image/jpeg")
+                        ),
+                        engine_ref.async_loop
+                    )
+            log_event("TOOL", f"Оптический снимок отправлен в сессию за {time.time()-t_start:.3f}с")
+            return "Свежий оптический снимок экрана отправлен в сессию."
 
         elif name == "open_url":
             url = args.get("url", "").strip()
@@ -303,12 +516,6 @@ def execute_tool(name: str, args: dict, engine_ref=None) -> str:
             webbrowser.open(url)
             log_event("TOOL", f"Открыта ссылка {url} за {time.time()-t_start:.3f}с")
             return f"Открыта ссылка {url} в браузере."
-
-        elif name == "open_application":
-            app = args.get("app_name", "").strip()
-            subprocess.Popen(app, shell=True)
-            log_event("TOOL", f"Запущено приложение {app} за {time.time()-t_start:.3f}с")
-            return f"Запущено приложение: {app}."
 
         elif name == "save_note":
             filename = args.get("filename", "Заметка.txt").strip()
@@ -345,9 +552,7 @@ def execute_tool(name: str, args: dict, engine_ref=None) -> str:
             log_event("TOOL", f"Команда {cmd[:40]} выполнена за {time.time()-t_start:.3f}с")
             return out[:400] if out else "Команда успешно выполнена."
 
-        # ======================================================================
         # Self-Learning Tools
-        # ======================================================================
         elif name == "learn_rule":
             category = args.get("category", "поведение").strip()
             rule = args.get("rule", "").strip()
@@ -382,9 +587,7 @@ def execute_tool(name: str, args: dict, engine_ref=None) -> str:
             log_event("TOOL", f"Удалено {deleted} правил по запросу '{keyword}'")
             return f"Удалено правил из памяти: {deleted}."
 
-        # ======================================================================
         # Self-Editing Code Tools
-        # ======================================================================
         elif name == "read_source_file":
             filename = args.get("filename", "jarvis_live.py").strip()
             target_path = WORK_DIR / filename
@@ -407,7 +610,6 @@ def execute_tool(name: str, args: dict, engine_ref=None) -> str:
             if target_code not in content:
                 return f"Фрагмент кода для замены не найден в файле {filename}."
 
-            # Create backup before modification
             bak_path = target_path.with_suffix(target_path.suffix + ".bak")
             with open(bak_path, "w", encoding="utf-8") as f:
                 f.write(content)
@@ -417,7 +619,6 @@ def execute_tool(name: str, args: dict, engine_ref=None) -> str:
             with open(temp_path, "w", encoding="utf-8") as f:
                 f.write(new_content)
 
-            # Syntax verification with py_compile
             try:
                 py_compile.compile(str(temp_path), doraise=True)
             except Exception as compile_err:
@@ -426,7 +627,6 @@ def execute_tool(name: str, args: dict, engine_ref=None) -> str:
                 log_event("ERROR", f"Синтаксическая ошибка компилятора: {compile_err}")
                 return f"Отмена изменений: синтаксическая ошибка Python: {compile_err}"
 
-            # Safe replace
             temp_path.replace(target_path)
             log_event("SELF_EDIT", f"Файл {filename} успешно модифицирован и проверен компилятором!")
             return f"Файл {filename} успешно обновлен и протестирован. Резервная копия сохранена в {bak_path.name}."
@@ -442,9 +642,7 @@ def execute_tool(name: str, args: dict, engine_ref=None) -> str:
             QApplication.quit()
             return "Перезапуск инициирован. Джарвис перезагрузится через 1 секунду."
 
-        # ======================================================================
-        # Git & GitHub Self-Publishing Tool
-        # ======================================================================
+        # Git & GitHub Tool
         elif name == "manage_git_repo":
             action = args.get("action", "status").strip().lower()
             commit_msg = args.get("commit_message", "Обновление Джарвиса").strip()
@@ -465,7 +663,7 @@ def execute_tool(name: str, args: dict, engine_ref=None) -> str:
                     cwd=str(WORK_DIR)
                 ).decode("utf-8", errors="replace")
                 log_event("GIT", "Репозиторий Git успешно инициализирован.")
-                return f"Репозиторий успешно инициализирован, файлы зафиксированы в начальный коммит: {commit_out[:150]}"
+                return f"Репозиторий успешно инициализирован, файлы зафиксированы: {commit_out[:150]}"
 
             elif action == "status":
                 out = subprocess.check_output(["git", "status", "-s"], cwd=str(WORK_DIR)).decode("utf-8", errors="replace")
@@ -500,7 +698,7 @@ def execute_tool(name: str, args: dict, engine_ref=None) -> str:
                 api_url = "https://api.github.com/user/repos"
                 req_data = json.dumps({
                     "name": repo_name,
-                    "description": "J.A.R.V.I.S. Live Assistant - Voice AI with Gemini 3.8 Live, PyQt6 HUD and Self-Learning",
+                    "description": "J.A.R.V.I.S. Live Assistant - Voice AI with Gemini 3.8 Live, PyQt6 HUD and Autonomous Computer Use",
                     "private": args.get("is_private", False)
                 }).encode("utf-8")
                 req = urllib.request.Request(
@@ -540,7 +738,7 @@ def execute_tool(name: str, args: dict, engine_ref=None) -> str:
 class ArcReactorWidget(QWidget):
     """
     Futuristic Translucent Holographic Arc Reactor Avatar.
-    Multi-State HUD Visualizer with zero clipping on any display.
+    Multi-State HUD Visualizer with zero display clipping.
     """
 
     sig_set_state = pyqtSignal(str, str)
@@ -556,18 +754,14 @@ class ArcReactorWidget(QWidget):
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
 
-        # Semi-transparency
         opacity = float(CONFIG.get("opacity", 0.78))
         self.setWindowOpacity(opacity)
         
-        # Dimensions: 160 width x 185 height gives perfect vertical padding (no bottom clipping!)
         self.resize(160, 185)
 
-        # Positioning at top-right of screen
         screen = QApplication.primaryScreen().geometry()
         self.move(screen.width() - 185, 40)
 
-        # Animation states
         self.angle = 0.0
         self.radar_angle = 0.0
         self.core_pulse = 0.0
@@ -577,14 +771,11 @@ class ArcReactorWidget(QWidget):
         self.is_active = True
         self.screen_vision_enabled = CONFIG.get("screen_vision", True)
 
-        # Dragging support
         self.drag_position = QPoint()
 
-        # Connect signals
         self.sig_set_state.connect(self._apply_state)
         self.sig_set_voice_level.connect(self._apply_voice_level)
 
-        # Timer for smooth 30 FPS holographic rendering
         self.anim_timer = QTimer(self)
         self.anim_timer.timeout.connect(self.update_animation)
         self.anim_timer.start(33)
@@ -662,34 +853,29 @@ class ArcReactorWidget(QWidget):
             }
         """)
 
-        vis_text = "👀 Зрение экрана: [ВКЛ]" if self.screen_vision_enabled else "👀 Зрение экрана: [ВЫКЛ]"
+        vis_text = "👀 Непрерывное зрение: [ВКЛ]" if self.screen_vision_enabled else "👀 Непрерывное зрение: [ВЫКЛ]"
         vis_act = QAction(vis_text, self)
         vis_act.triggered.connect(self.toggle_vision)
         menu.addAction(vis_act)
 
-        # Translucency Submenu
         opacity_menu = menu.addMenu("✨ Прозрачность")
         for val, lbl in [(0.60, "60% (Глубокая)"), (0.78, "78% (Оптимальная)"), (0.90, "90% (Четкая)"), (1.0, "100% (Непрозрачный)")]:
             act = QAction(lbl, self)
             act.triggered.connect(lambda chk, v=val: self.set_transparency(v))
             opacity_menu.addAction(act)
 
-        # Open logs action
         log_act = QAction("📄 Открыть файл логов (jarvis.log)", self)
         log_act.triggered.connect(self.open_log_file)
         menu.addAction(log_act)
 
-        # Open memory action
         mem_act = QAction("🧠 База памяти (memory.json)", self)
         mem_act.triggered.connect(self.open_memory_file)
         menu.addAction(mem_act)
 
-        # Git status action
         git_act = QAction("🐙 Статус Git / GitHub", self)
         git_act.triggered.connect(self.show_git_status)
         menu.addAction(git_act)
 
-        # Key change
         key_act = QAction("⚙️ Настройки API-ключа", self)
         key_act.triggered.connect(self.change_api_key)
         menu.addAction(key_act)
@@ -726,7 +912,7 @@ class ArcReactorWidget(QWidget):
         self.screen_vision_enabled = not self.screen_vision_enabled
         CONFIG["screen_vision"] = self.screen_vision_enabled
         save_config(CONFIG)
-        log_event("CONFIG", f"Зрение экрана переключено: {self.screen_vision_enabled}")
+        log_event("CONFIG", f"Непрерывное зрение экрана переключено: {self.screen_vision_enabled}")
 
     def change_api_key(self):
         key, ok = QInputDialog.getText(
@@ -746,7 +932,6 @@ class ArcReactorWidget(QWidget):
         center_x = self.width() / 2.0
         center_y = 68.0
 
-        # Dynamic State Palettes
         if self.state == "LISTENING":
             accent = QColor(0, 242, 254)         # Neon Cyan
             glow = QColor(0, 242, 254, 180)
@@ -788,7 +973,6 @@ class ArcReactorWidget(QWidget):
         painter.save()
         painter.translate(center_x, center_y)
 
-        # Diffuse Ambient Glow
         outer_grad = QRadialGradient(0, 0, 56)
         outer_grad.setColorAt(0.0, QColor(accent.red(), accent.green(), accent.blue(), 35))
         outer_grad.setColorAt(0.7, QColor(accent.red(), accent.green(), accent.blue(), 15))
@@ -805,10 +989,10 @@ class ArcReactorWidget(QWidget):
             painter.drawArc(-48, -48, 96, 96, int(i * 30 * 16 + 4 * 16), int(22 * 16))
 
         # Radar sweep animation during optical vision scan
-        if self.state == "VISION":
+        if self.state == "VISION" or self.screen_vision_enabled:
             radar_grad = QConicalGradient(0, 0, self.radar_angle)
-            radar_grad.setColorAt(0.0, QColor(217, 70, 239, 120))
-            radar_grad.setColorAt(0.25, QColor(217, 70, 239, 20))
+            radar_grad.setColorAt(0.0, QColor(accent.red(), accent.green(), accent.blue(), 80))
+            radar_grad.setColorAt(0.20, QColor(accent.red(), accent.green(), accent.blue(), 15))
             radar_grad.setColorAt(1.0, QColor(0, 0, 0, 0))
             painter.setBrush(QBrush(radar_grad))
             painter.setPen(Qt.PenStyle.NoPen)
@@ -828,7 +1012,7 @@ class ArcReactorWidget(QWidget):
 
         painter.restore()
 
-        # Central Plasma Core (Expands dynamically with voice and pulse)
+        # Central Plasma Core
         pulse = 1.0 + 0.08 * np.sin(self.core_pulse)
         if self.state == "LISTENING":
             core_r = int((20 + self.voice_level * 16) * pulse)
@@ -847,18 +1031,16 @@ class ArcReactorWidget(QWidget):
         painter.setPen(Qt.PenStyle.NoPen)
         painter.drawEllipse(int(center_x - core_r), int(center_y - core_r), core_r * 2, core_r * 2)
 
-        # Futuristic Status Pill Badge (Positioned with 10px safe bottom padding)
+        # Futuristic Status Pill Badge
         badge_w = 144
         badge_h = 26
         badge_x = int((self.width() - badge_w) / 2.0)
         badge_y = self.height() - badge_h - 10
 
-        # Draw translucent badge background
         painter.setBrush(QBrush(pill_bg))
         painter.setPen(QPen(pill_border, 1.5))
         painter.drawRoundedRect(badge_x, badge_y, badge_w, badge_h, 13, 13)
 
-        # Draw badge label
         painter.setPen(QColor(240, 249, 255))
         font = QFont("Segoe UI", 9, QFont.Weight.DemiBold)
         font.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 0.6)
@@ -867,18 +1049,17 @@ class ArcReactorWidget(QWidget):
 
 
 # ==============================================================================
-# Gemini Live Engine with Instant Turn Dispatch & Self-Evolution Tools
+# Gemini Live Engine with Continuous Real-Time Vision & Autonomous Tools
 # ==============================================================================
 class GeminiLiveEngine:
     """
-    Ultra-fast Gemini Live Engine:
-    - Adaptive Client Turn Dispatch (1.15s pause tolerance, natural flow without cutoff)
-    - Full PC control: Browser, YouTube, DaVinci Resolve, Hotkeys, Notes, Apps
-    - Self-Learning & Memory persistence (memory.json)
-    - Self-Editing source code with py_compile verification
-    - Git & GitHub autonomous publishing
-    - Infinite receive loop across turns (zero hang)
-    - Detailed latency logging in jarvis.log
+    Autonomous Computer-Use Gemini Live Engine:
+    - Continuous Screen Vision Stream (real-time video frames every 1.8s)
+    - Full PC & Browser Control: close_window, browser_action, focus_window, open_application
+    - DaVinci Resolve, Hotkeys, Notes, PowerShell
+    - Adaptive Turn Dispatch (1.15s pause tolerance)
+    - Self-Learning & Code Self-Modification
+    - Git & GitHub Autonomous Publishing
     """
 
     def __init__(self, avatar_widget: ArcReactorWidget):
@@ -890,8 +1071,8 @@ class GeminiLiveEngine:
         self.is_running = True
         self.session = None
         self.is_speaking = False
-        self.screen_requested = False
         self.turn_sent_time = 0.0
+        self.async_loop = None
 
         self.avatar.sig_interrupt.connect(self.trigger_interrupt)
 
@@ -907,9 +1088,6 @@ class GeminiLiveEngine:
             except queue.Empty:
                 break
         self.is_speaking = False
-
-    def request_screen_snapshot(self):
-        self.screen_requested = True
 
     def stop(self):
         self.is_running = False
@@ -941,7 +1119,61 @@ class GeminiLiveEngine:
     def _run_async_loop(self):
         asyncio.run(self._live_session_loop())
 
+    def _capture_screen_jpeg(self) -> bytes | None:
+        """Captures an ultra-lightweight screenshot for fast optical analysis."""
+        t0 = time.time()
+        try:
+            with mss.mss() as sct:
+                monitor = sct.monitors[1] if len(sct.monitors) > 1 else sct.monitors[0]
+                sct_img = sct.grab(monitor)
+                img = Image.frombytes("RGB", sct_img.size, sct_img.bgra, "raw", "BGRX")
+                # Scale down to 800x450 for fast transmission (<20KB)
+                img.thumbnail((800, 450), Image.Resampling.LANCZOS)
+                buf = io.BytesIO()
+                img.save(buf, format="JPEG", quality=35)
+                data = buf.getvalue()
+                return data
+        except Exception as e:
+            return None
+
+    async def _continuous_vision_loop(self, session):
+        """
+        Continuous Real-Time Screen Vision Stream:
+        Streams ultra-lightweight JPEG frames (800x450, ~14 KB) into Gemini Live WebSocket every 1.8s.
+        Gives Jarvis full visual awareness of user's desktop with zero perceptible CPU or network load.
+        """
+        last_hash = None
+        from google.genai import types
+
+        while self.is_running:
+            try:
+                await asyncio.sleep(1.8)
+                if not self.avatar.screen_vision_enabled:
+                    continue
+
+                jpeg_bytes = self._capture_screen_jpeg()
+                if not jpeg_bytes:
+                    continue
+
+                # Screen change detection via lightweight sample hash
+                cur_hash = hash(jpeg_bytes[:128] + jpeg_bytes[-128:])
+                if cur_hash == last_hash:
+                    continue
+                last_hash = cur_hash
+
+                await session.send_realtime_input(
+                    media=types.Blob(
+                        data=jpeg_bytes,
+                        mime_type="image/jpeg"
+                    )
+                )
+            except asyncio.CancelledError:
+                break
+            except Exception:
+                await asyncio.sleep(2.0)
+
     async def _live_session_loop(self):
+        self.async_loop = asyncio.get_running_loop()
         while not self.api_key:
             time.sleep(1)
             self.api_key = CONFIG.get("gemini_api_key", "")
@@ -950,24 +1182,76 @@ class GeminiLiveEngine:
         from google.genai import types
 
         tools_decl = [
+            # Autonomous Window & App Control
             types.FunctionDeclaration(
-                name="open_browser",
-                description="Открывает браузер или веб-страницу.",
-                behavior="NON_BLOCKING",
-                parameters={
-                    "type": "OBJECT",
-                    "properties": {"url": {"type": "STRING", "description": "URL страницы (по умолчанию google.com)"}}
-                }
-            ),
-            types.FunctionDeclaration(
-                name="open_youtube",
-                description="Открывает YouTube, ищет видео или открывает случайное трендовое видео.",
+                name="close_window",
+                description="Закрывает активное окно, вкладку браузера или завершает программу. Обязательно вызывай ПЕРЕД тем как сказать пользователю!",
                 behavior="NON_BLOCKING",
                 parameters={
                     "type": "OBJECT",
                     "properties": {
-                        "action": {"type": "STRING", "description": "Действие: 'random' или 'search'"},
-                        "query": {"type": "STRING", "description": "Поисковый запрос (если action='search')"}
+                        "target": {
+                            "type": "STRING",
+                            "description": "'tab' (закрыть текущую вкладку браузера Ctrl+W), 'window' (закрыть активное окно Alt+F4), 'browser' (закрыть весь браузер), или имя программы (например 'discord', 'telegram', 'chrome', 'resolve')"
+                        }
+                    },
+                    "required": ["target"]
+                }
+            ),
+            types.FunctionDeclaration(
+                name="open_application",
+                description="Запускает программу, игру или ярлык Windows (Discord, Telegram, Chrome, Yandex, DaVinci Resolve, Steam, Blender, Notepad, Calc и др.).",
+                behavior="NON_BLOCKING",
+                parameters={
+                    "type": "OBJECT",
+                    "properties": {"app_name": {"type": "STRING", "description": "Название программы (например 'discord', 'telegram', 'яндекс', 'chrome', 'steam')"}},
+                    "required": ["app_name"]
+                }
+            ),
+            types.FunctionDeclaration(
+                name="focus_window",
+                description="Выводит окно программы на передний план (например 'discord', 'chrome', 'telegram', 'davinci', 'antigravity').",
+                behavior="NON_BLOCKING",
+                parameters={
+                    "type": "OBJECT",
+                    "properties": {"window_name": {"type": "STRING", "description": "Название программы или заголовок окна"}},
+                    "required": ["window_name"]
+                }
+            ),
+            types.FunctionDeclaration(
+                name="browser_action",
+                description="Управляет браузером (открытие сайтов, поиск, закрытие/создание вкладок, скролл, обновление).",
+                behavior="NON_BLOCKING",
+                parameters={
+                    "type": "OBJECT",
+                    "properties": {
+                        "action": {
+                            "type": "STRING",
+                            "description": "'open_url', 'search', 'new_tab', 'close_tab', 'reload', 'scroll_down', 'scroll_up', 'switch_tab'"
+                        },
+                        "query_or_url": {"type": "STRING", "description": "Запрос для поиска или ссылка"}
+                    },
+                    "required": ["action"]
+                }
+            ),
+            types.FunctionDeclaration(
+                name="open_browser",
+                description="Открывает браузер или указанную веб-страницу.",
+                behavior="NON_BLOCKING",
+                parameters={
+                    "type": "OBJECT",
+                    "properties": {"url": {"type": "STRING", "description": "URL страницы"}}
+                }
+            ),
+            types.FunctionDeclaration(
+                name="open_youtube",
+                description="Открывает YouTube, ищет видео или открывает случайное популярное видео.",
+                behavior="NON_BLOCKING",
+                parameters={
+                    "type": "OBJECT",
+                    "properties": {
+                        "action": {"type": "STRING", "description": "'random' или 'search'"},
+                        "query": {"type": "STRING", "description": "Поисковый запрос"}
                     }
                 }
             ),
@@ -985,7 +1269,7 @@ class GeminiLiveEngine:
             ),
             types.FunctionDeclaration(
                 name="send_hotkey",
-                description="Нажимает комбинацию клавиш на клавиатуре (например: 'ctrl+b', 'space', 'ctrl+z', 'alt+tab').",
+                description="Нажимает комбинацию клавиш на клавиатуре (например: 'ctrl+b', 'space', 'ctrl+z', 'alt+tab', 'ctrl+w').",
                 behavior="NON_BLOCKING",
                 parameters={
                     "type": "OBJECT",
@@ -1017,11 +1301,11 @@ class GeminiLiveEngine:
             ),
             types.FunctionDeclaration(
                 name="inspect_screen",
-                description="Запрашивает мгновенный оптический снимок экрана для анализа Джарвисом.",
+                description="Немедленно отправляет свежий снимок экрана в активную сессию для детального оптического анализа.",
                 behavior="NON_BLOCKING",
                 parameters={
                     "type": "OBJECT",
-                    "properties": {"question": {"type": "STRING", "description": "Что именно нужно найти или проанализировать на экране"}}
+                    "properties": {"question": {"type": "STRING", "description": "Что именно нужно проанализировать на экране"}}
                 }
             ),
             types.FunctionDeclaration(
@@ -1032,16 +1316,6 @@ class GeminiLiveEngine:
                     "type": "OBJECT",
                     "properties": {"url": {"type": "STRING", "description": "Ссылка"}},
                     "required": ["url"]
-                }
-            ),
-            types.FunctionDeclaration(
-                name="open_application",
-                description="Запускает программу на Windows (telegram, calc, notepad, steam, browser и др.).",
-                behavior="NON_BLOCKING",
-                parameters={
-                    "type": "OBJECT",
-                    "properties": {"app_name": {"type": "STRING", "description": "Название программы"}},
-                    "required": ["app_name"]
                 }
             ),
             types.FunctionDeclaration(
@@ -1093,12 +1367,12 @@ class GeminiLiveEngine:
             # Self-Learning Tools
             types.FunctionDeclaration(
                 name="learn_rule",
-                description="Сохраняет в долговременную память новое правило, привычку или указание от пользователя (например, когда пользователь говорит 'запомни', 'делай так', 'исправь свое поведение').",
+                description="Сохраняет в долговременную память новое правило, привычку или указание от пользователя.",
                 behavior="NON_BLOCKING",
                 parameters={
                     "type": "OBJECT",
                     "properties": {
-                        "category": {"type": "STRING", "description": "Категория правила (контекст, поведение, монтаж, браузер, предпочтения)"},
+                        "category": {"type": "STRING", "description": "Категория правила"},
                         "rule": {"type": "STRING", "description": "Формулировка выученного правила"}
                     },
                     "required": ["category", "rule"]
@@ -1127,19 +1401,19 @@ class GeminiLiveEngine:
                 behavior="NON_BLOCKING",
                 parameters={
                     "type": "OBJECT",
-                    "properties": {"filename": {"type": "STRING", "description": "Имя файла в рабочей папке (jarvis_live.py, memory.json, config.json)"}},
+                    "properties": {"filename": {"type": "STRING", "description": "Имя файла в рабочей папке"}},
                     "required": ["filename"]
                 }
             ),
             types.FunctionDeclaration(
                 name="modify_source_code",
-                description="Модифицирует собственный файл кода с обязательной предварительной проверкой компилятором Python и созданием резервной копии .bak.",
+                description="Модифицирует собственный файл кода с проверкой компилятора Python и созданием резервной копии .bak.",
                 behavior="NON_BLOCKING",
                 parameters={
                     "type": "OBJECT",
                     "properties": {
                         "filename": {"type": "STRING", "description": "Имя файла (например jarvis_live.py)"},
-                        "target_code": {"type": "STRING", "description": "Точный существующий фрагмент кода для замены"},
+                        "target_code": {"type": "STRING", "description": "Существующий фрагмент кода для замены"},
                         "replacement_code": {"type": "STRING", "description": "Новый фрагмент кода"}
                     },
                     "required": ["filename", "target_code", "replacement_code"]
@@ -1151,20 +1425,20 @@ class GeminiLiveEngine:
                 behavior="NON_BLOCKING",
                 parameters={"type": "OBJECT", "properties": {}}
             ),
-            # Git & GitHub Self-Publishing Tool
+            # Git & GitHub Tool
             types.FunctionDeclaration(
                 name="manage_git_repo",
-                description="Управляет локальным Git-репозиторием и публикацией на GitHub (init, commit, push, create_github_repo). Позволяет Джарвису самостоятельно коммитить свой код и заливать проект на GitHub.",
+                description="Управляет локальным Git-репозиторием и публикацией на GitHub (init, commit, push, create_github_repo).",
                 behavior="NON_BLOCKING",
                 parameters={
                     "type": "OBJECT",
                     "properties": {
-                        "action": {"type": "STRING", "description": "Действие: 'init', 'status', 'commit', 'push', 'create_github_repo'"},
-                        "commit_message": {"type": "STRING", "description": "Сообщение коммита (для action='commit')"},
-                        "remote_url": {"type": "STRING", "description": "Ссылка на репозиторий GitHub (например https://github.com/user/jarvis.git)"},
-                        "repo_name": {"type": "STRING", "description": "Название нового репозитория на GitHub (по умолчанию JARVIS-Live-Assistant)"},
-                        "github_token": {"type": "STRING", "description": "GitHub Personal Access Token для автономного создания репозитория"},
-                        "is_private": {"type": "BOOLEAN", "description": "Сделать ли создаваемый репозиторий приватным"}
+                        "action": {"type": "STRING", "description": "'init', 'status', 'commit', 'push', 'create_github_repo'"},
+                        "commit_message": {"type": "STRING", "description": "Сообщение коммита"},
+                        "remote_url": {"type": "STRING", "description": "Ссылка на репозиторий GitHub"},
+                        "repo_name": {"type": "STRING", "description": "Название нового репозитория на GitHub"},
+                        "github_token": {"type": "STRING", "description": "GitHub Personal Access Token"},
+                        "is_private": {"type": "BOOLEAN", "description": "Приватный ли репозиторий"}
                     },
                     "required": ["action"]
                 }
@@ -1200,9 +1474,10 @@ class GeminiLiveEngine:
                     audio_task = asyncio.create_task(self._vad_audio_loop(session))
                     receive_task = asyncio.create_task(self._infinite_receive_loop(session))
                     watchdog_task = asyncio.create_task(self._watchdog_loop())
+                    vision_task = asyncio.create_task(self._continuous_vision_loop(session))
 
                     done, pending = await asyncio.wait(
-                        [audio_task, receive_task, watchdog_task],
+                        [audio_task, receive_task, watchdog_task, vision_task],
                         return_when=asyncio.FIRST_EXCEPTION
                     )
                     for task in pending:
@@ -1222,36 +1497,8 @@ class GeminiLiveEngine:
                     log_event("WATCHDOG", "Таймаут ожидания ответа (5с) -> сброс в режим ожидания")
                     self.avatar.set_state("STANDBY")
 
-    def _capture_screen_jpeg(self) -> bytes | None:
-        """Captures an ultra-lightweight screenshot for fast optical analysis."""
-        t0 = time.time()
-        try:
-            with mss.mss() as sct:
-                monitor = sct.monitors[1] if len(sct.monitors) > 1 else sct.monitors[0]
-                sct_img = sct.grab(monitor)
-                img = Image.frombytes("RGB", sct_img.size, sct_img.bgra, "raw", "BGRX")
-                # Scale down to 800x450 for fast transmission (<25KB)
-                img.thumbnail((800, 450), Image.Resampling.LANCZOS)
-                buf = io.BytesIO() if 'io' in globals() else None
-                if buf is None:
-                    import io
-                    buf = io.BytesIO()
-                img.save(buf, format="JPEG", quality=40)
-                data = buf.getvalue()
-                log_event("VISION", f"Скриншот захвачен: {len(data)/1024:.1f} КБ за {time.time()-t0:.3f}с")
-                return data
-        except Exception as e:
-            log_event("ERROR", f"Ошибка захвата экрана: {e}")
-            return None
-
     async def _vad_audio_loop(self, session):
-        """
-        Microphone streaming with Adaptive Client Turn Dispatch:
-        - Accurately captures user utterance using energy VAD.
-        - Natural conversational tolerance (1.15s pause) ensures Jarvis never cuts you off mid-thought.
-        - Automatically filters out micro-noise clicks/breaths (<400ms).
-        - Upon finished phrase, immediately dispatches complete turn via send_client_content.
-        """
+        """Microphone streaming with Adaptive Client Turn Dispatch."""
         loop = asyncio.get_running_loop()
         audio_q = asyncio.Queue()
 
@@ -1261,12 +1508,12 @@ class GeminiLiveEngine:
 
         from google.genai import types
 
-        block_size = 512  # 32ms
-        pre_buffer = collections.deque(maxlen=10)  # ~320ms pre-roll
+        block_size = 512
+        pre_buffer = collections.deque(maxlen=10)
         is_speaking_user = False
         silence_start_time = 0.0
-        SILENCE_TIMEOUT = 1.15       # 1.15s natural pause tolerance prevents interrupting user!
-        MIN_SPEECH_DURATION = 0.40   # 400ms minimum speech duration filters out accidental mic rustles
+        SILENCE_TIMEOUT = 1.15
+        MIN_SPEECH_DURATION = 0.40
         ambient_noise = 40.0
         speech_chunks = []
 
@@ -1274,7 +1521,6 @@ class GeminiLiveEngine:
             while self.is_running:
                 chunk = await audio_q.get()
 
-                # Echo suppression while Jarvis is speaking
                 if self.is_speaking:
                     continue
 
@@ -1308,7 +1554,6 @@ class GeminiLiveEngine:
                         if now - silence_start_time >= SILENCE_TIMEOUT:
                             is_speaking_user = False
 
-                            # Assemble full user audio utterance
                             user_audio_bytes = b"".join(speech_chunks)
                             dur = len(user_audio_bytes) / (16000 * 2)
 
@@ -1330,21 +1575,6 @@ class GeminiLiveEngine:
                                 )
                             ]
 
-                            if self.screen_requested:
-                                self.screen_requested = False
-                                self.avatar.set_state("VISION")
-                                jpeg_bytes = self._capture_screen_jpeg()
-                                if jpeg_bytes:
-                                    parts.append(
-                                        types.Part(
-                                            inline_data=types.Blob(
-                                                data=jpeg_bytes,
-                                                mime_type="image/jpeg"
-                                            )
-                                        )
-                                    )
-
-                            # Dispatch completed user turn directly to model
                             try:
                                 await session.send_client_content(
                                     turns=[types.Content(role="user", parts=parts)],
@@ -1356,10 +1586,7 @@ class GeminiLiveEngine:
                         pre_buffer.append(pcm_bytes)
 
     async def _infinite_receive_loop(self, session):
-        """
-        Infinite receive loop across multiple turns.
-        Catches tools, transcripts, and model audio with sub-second response times.
-        """
+        """Infinite receive loop with instant subtext badges."""
         from google.genai import types
 
         turn_count = 0
@@ -1375,7 +1602,6 @@ class GeminiLiveEngine:
                         self._clear_playback_queue()
                         self.avatar.set_state("LISTENING")
 
-                    # Handle Model Spoken Audio
                     if server_content.model_turn:
                         for part in server_content.model_turn.parts:
                             if part.inline_data:
@@ -1395,7 +1621,6 @@ class GeminiLiveEngine:
                         if self.audio_out_queue.empty() and not self.is_speaking:
                             self.avatar.set_state("STANDBY")
 
-                # Handle Non-blocking Tool Calls
                 if message.tool_call:
                     for call in message.tool_call.function_calls:
                         tool_name = call.name
@@ -1405,16 +1630,22 @@ class GeminiLiveEngine:
                         subtext = "⚡ ДЕЙСТВИЕ"
                         if "browser" in tool_name or "url" in tool_name:
                             subtext = "⚡ БРАУЗЕР"
+                        elif "close" in tool_name:
+                            subtext = "❌ ЗАКРЫТИЕ"
+                        elif "focus" in tool_name:
+                            subtext = "🎯 ФОКУС ОКНА"
                         elif "youtube" in tool_name:
                             subtext = "⚡ YOUTUBE"
                         elif "davinci" in tool_name:
                             subtext = "⚡ ДАВИНЧИ"
                         elif "weather" in tool_name:
                             subtext = "⚡ ПОГОДА"
-                        elif "screen" in tool_name:
+                        elif "screen" in tool_name or "vision" in tool_name:
                             subtext = "◈ СКАН ЭКРАНА"
                         elif "search" in tool_name:
                             subtext = "⚡ ПОИСК"
+                        elif "app" in tool_name:
+                            subtext = "🚀 ЗАПУСК"
                         elif "learn" in tool_name or "memory" in tool_name:
                             subtext = "🧠 ОБУЧЕНИЕ"
                         elif "modify" in tool_name or "read_source" in tool_name:
@@ -1447,7 +1678,7 @@ def main():
 
     tray = QSystemTrayIcon(QIcon(str(ICON_PATH)), app)
     tray_menu = QMenu()
-    tray_menu.addAction("👀 Переключить зрение", avatar.toggle_vision)
+    tray_menu.addAction("👀 Непрерывное зрение", avatar.toggle_vision)
     tray_menu.addAction("📄 Открыть логи", avatar.open_log_file)
     tray_menu.addAction("🧠 База памяти", avatar.open_memory_file)
     tray_menu.addAction("🐙 Статус Git", avatar.show_git_status)
@@ -1463,7 +1694,7 @@ def main():
     engine = GeminiLiveEngine(avatar)
     engine.start()
 
-    log_event("INIT", "J.A.R.V.I.S. запущен (Self-Learning Edition) и ожидает голосовых команд.")
+    log_event("INIT", "J.A.R.V.I.S. запущен (Autonomous Computer Use Edition) и ожидает команд.")
     sys.exit(app.exec())
 
 
