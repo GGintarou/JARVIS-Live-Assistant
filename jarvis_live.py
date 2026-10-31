@@ -1,11 +1,18 @@
 import os
 import sys
+import pathlib
+
+# Ensure virtualenv site-packages are loaded immediately before third-party imports
+WORK_DIR = pathlib.Path(r"C:\Users\proko\.gemini\antigravity\scratch\jarvis_live")
+venv_site = WORK_DIR / ".venv" / "Lib" / "site-packages"
+if venv_site.exists() and str(venv_site) not in sys.path:
+    sys.path.insert(0, str(venv_site))
+
 import io
 import json
 import time
 import queue
 import random
-import pathlib
 import asyncio
 import logging
 import datetime
@@ -1322,7 +1329,7 @@ class GeminiLiveEngine:
     def _capture_screen_jpeg(self) -> bytes | None:
         """Captures crisp 1280x720 screenshot for precise OCR and zero hallucination."""
         try:
-            with mss.mss() as sct:
+            with mss.MSS() as sct:
                 monitor = sct.monitors[1] if len(sct.monitors) > 1 else sct.monitors[0]
                 sct_img = sct.grab(monitor)
                 img = Image.frombytes("RGB", sct_img.size, sct_img.bgra, "raw", "BGRX")
@@ -1610,10 +1617,10 @@ class GeminiLiveEngine:
                     self.session = session
                     log_event("NET", f"Успешно подключено к Gemini Live за {time.time()-t_conn:.2f}с! Джарвис на связи.")
 
-                    audio_task = asyncio.create_task(self._vad_audio_loop(session))
-                    receive_task = asyncio.create_task(self._infinite_receive_loop(session))
-                    watchdog_task = asyncio.create_task(self._watchdog_loop())
-                    vision_task = asyncio.create_task(self._continuous_vision_loop(session))
+                    audio_task = asyncio.create_task(self._vad_audio_loop(session), name="AudioVAD")
+                    receive_task = asyncio.create_task(self._infinite_receive_loop(session), name="ReceiveLoop")
+                    watchdog_task = asyncio.create_task(self._watchdog_loop(), name="Watchdog")
+                    vision_task = asyncio.create_task(self._continuous_vision_loop(session), name="VisionLoop")
 
                     done, pending = await asyncio.wait(
                         [audio_task, receive_task, watchdog_task, vision_task],
@@ -1621,6 +1628,10 @@ class GeminiLiveEngine:
                     )
                     for task in pending:
                         task.cancel()
+                    for task in done:
+                        exc = task.exception()
+                        if exc:
+                            log_event("ERROR", f"Сбой подсистемы {task.get_name()}: {exc}")
 
             except Exception as e:
                 log_event("NET", f"Соединение завершено: {e}. Быстрое переподключение...")

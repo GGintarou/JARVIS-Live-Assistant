@@ -1,3 +1,13 @@
+import sys
+import os
+import pathlib
+
+# Ensure virtualenv site-packages are loaded
+WORK_DIR = pathlib.Path(r"C:\Users\proko\.gemini\antigravity\scratch\jarvis_live")
+venv_site = WORK_DIR / ".venv" / "Lib" / "site-packages"
+if venv_site.exists() and str(venv_site) not in sys.path:
+    sys.path.insert(0, str(venv_site))
+
 import time
 import dataclasses
 from typing import Type, TypeVar, Optional, Set, Dict, List
@@ -5,7 +15,6 @@ import ctypes
 from ctypes import wintypes
 import psutil
 import pyautogui
-import os
 
 user32 = ctypes.windll.user32
 try:
