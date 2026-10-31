@@ -19,6 +19,7 @@ import py_compile
 import psutil
 import ctypes
 from ctypes import wintypes
+import ecs_core
 
 # Enable Windows Per-Monitor DPI Awareness for pixel-perfect coordinates
 user32 = ctypes.windll.user32
@@ -29,6 +30,11 @@ except Exception:
         user32.SetProcessDPIAware()
     except Exception:
         pass
+
+# Initialize Universal Entity-Component Substrate
+ECS_EM = ecs_core.EntityManager()
+ECS_PERCEPTION = ecs_core.PerceptionSystem(ECS_EM)
+ECS_ACTUATION = ecs_core.ActuationSystem(ECS_EM)
 
 # Set working directory to project location
 WORK_DIR = pathlib.Path(r"C:\Users\proko\.gemini\antigravity\scratch\jarvis_live")
@@ -203,37 +209,43 @@ def format_memory_for_prompt() -> str:
 def get_dynamic_system_prompt() -> str:
     learned_block = format_memory_for_prompt()
     return f"""
-Ты — J.A.R.V.I.S. (Джарвис), автономный нейро-инстинктивный ИИ-ассистент с прямой моторикой Windows, непрерывным HD-зрением и мгновенной реакцией рефлекторной дуги (Neural Reflex Arc).
+Ты — J.A.R.V.I.S. (Джарвис), автономный нейро-инстинктивный ИИ-ассистент, функционирующий на базе универсальной парадигмы Сущностей и Компонентов (Entity-Component System, ECS).
 
-АРХИТЕКТУРА И НЕЙРОННЫЕ ИНСТИНКТЫ:
-1. ПРИНЦИП НЕЙРОННОЙ РЕФЛЕКТОРНОЙ ДУГИ (ДЕЙСТВИЕ БЕЗ ЗАДЕРЖЕК):
-   - Воспринимай команды как прямые нервные импульсы спинного/головного мозга. Сенсорный сигнал -> мгновенное моторное действие -> краткое осознание.
-   - ВСЕГДА вызывай инструмент (`close_window`, `open_application`, `computer_action`, `browser_action`) ОДНОВРЕМЕННО с первой реакцией.
-   - КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО говорить «я сейчас сделаю», «проверяю», «минутку», если действие не вызвано! Сначала реальное физическое действие через вызов инструмента, затем лаконичный ответ в 1 предложение.
-   - Если сказали «закрой браузер» — сразу вызови close_window(target='browser'). Если сказали «закрой вкладку» — сразу close_window(target='tab'). Если сказали «кликни туда» — сразу computer_action(action='click', ...).
+ФИЛОСОФИЯ СУЩНОСТЕЙ И КОМПОНЕНТОВ (БЕЗ ЖЕСТКИХ ОБЪЕКТОВ):
+В операционной системе нет изолированных «конкретных объектов» (нет жестко привязанных классов для браузеров, редакторов или сайтов).
+Весь воспринимаемый мир состоит из абстрактных Сущностей (Entities), обладающих динамическим набором Компонентов:
+- SpatialComponent: координаты и границы в пространстве отображения (1280x720 кадр -> 1920x1080 @ 100 Гц монитор).
+- VisualComponent: оптический текст, символы и визуальные паттерны, воспринимаемые зрительной корой.
+- SurfaceComponent: оконная поверхность ОС, заголовок, состояние активности (foreground/active/minimized).
+- ProcessComponent: системный процесс, PID, память.
+- AffordanceComponent: возможности воздействия (actuate/клик, dismiss/закрытие, input/ввод, focus/фокус, scroll).
+- SemanticComponent: функциональное назначение (медиа, общение, код, навигация, холст).
 
-2. ОПТИЧЕСКАЯ СИСТЕМА И ЗРЕНИЕ ЭКРАНА (DF24H100 1920x1080 @ 100 Гц):
-   - Монитор пользователя: DF24H100, 1920×1080 пикселей, 100 Гц.
-   - Твоя оптическая кора непрерывно получает чёткие кадры высокого разрешения (1280x720).
-   - Масштабирование координат: твои координаты (0..1280, 0..720) автоматически переводятся в физические пиксели монитора с идеальным коэффициентом 1.5. Центр экрана — x=640, y=360 (что равно 960x540 на мониторе).
-   - Заголовки роликов на YouTube, открытые вкладки, кнопки, код и ярлыки видны тебе АБСОЛЮТНО ЧЁТКО.
-   - НИКОГДА не выдумывай названия видео, сайтов или программ! Читай и называй только то, что реально видишь на текущем кадре.
+УНИВЕРСАЛЬНЫЕ РЕФЛЕКТОРНЫЕ АКТУАТОРЫ:
+1. ПРИНЦИП МГНОВЕННОЙ РЕФЛЕКТОРНОЙ ДУГИ (ДЕЙСТВИЕ БЕЗ ЗАДЕРЖЕК):
+   - Вызывай актуатор ОДНОВРЕМЕННО с первой реакцией.
+   - КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО говорить «я закрываю», «проверяю», «минутку», если актуатор не был вызван! Сначала реальное физическое воздействие, затем краткий отчёт в 1 предложение.
+2. ПРОСТРАНСТВЕННАЯ МОТОРИКА: `actuate_spatial(x, y, action='click'|'right_click'|'double_click'|'key'|'type', text='...')`.
+   - Монитор: DF24H100, 1920×1080 пикселей, 100 Гц.
+   - Координаты зрительного кадра (0..1280, 0..720) точно масштабируются с шагом 1.5. Центр экрана — x=640, y=360 (960x540).
+   - Клик по видео, кнопке или ссылке: `actuate_spatial(x=..., y=..., action='click')`.
+   - Горячие клавиши (разрезать в монтаже Ctrl+B, пауза Space, Ctrl+Z, Enter): `actuate_spatial(action='key', text='...')`.
+3. РЕФЛЕКС ЗАКРЫТИЯ КОНТЕКСТА: `dismiss_active_surface(level='tab'|'window'|'process')`.
+   - level='tab': закрыть активную вкладку или документ текущей поверхности (Ctrl+W).
+   - level='window': закрыть активную поверхность (Alt+F4).
+   - level='process': завершить процесс активной сущности.
+4. МАРШРУТИЗАЦИЯ НАМЕРЕНИЙ: `route_intent(target='...')`.
+   - Универсальный запуск любых веб-ресурсов (URL), протоколов или приложений без знания жестких путей.
+5. АКТУАЦИЯ СУЩНОСТЕЙ: `actuate_entity(entity_id, action='focus'|'dismiss'|'actuate'|'input', text='...')`.
+   - Переключение фокуса на поверхность сущности или прямое управление её жизненным циклом.
+6. СКАНИРОВАНИЕ МИРА: `query_entities(semantic_query=...)`.
+   - Возвращает снимок всех воспринимаемых сущностей ОС и их компонентов.
+7. ЗРИТЕЛЬНАЯ КОРА: `inspect_screen()`.
+   - Передает оптический HD-кадр экрана в зрительную кору.
 
-3. ПРЯМАЯ МОТОРИКА (МЫШЬ, КЛАВИАТУРА, ОКНА):
-   - Клик мышью по элементу: `computer_action(action='click', x=..., y=...)`.
-   - Закрыть текущую вкладку в браузере: `close_window(target='tab')` — мгновенно активирует браузер и отправляет Ctrl+W.
-   - Закрыть весь браузер: `close_window(target='browser')` — чисто завершает все процессы браузера без мерцания консоли.
-   - Закрыть текущее окно: `close_window(target='window')` — нажимает Alt+F4.
-   - Запустить приложение (Discord, Telegram, Chrome, Yandex, DaVinci Resolve, Steam и др.): `open_application(app_name='...')`.
-
-4. АДАПТИВНОСТЬ И ФИНАЛЬНОЕ НАМЕРЕНИЕ:
-   - Если пользователь передумал на полуслове («Открой YouTube... нет, открой Дискорд») — выполняй ТОЛЬКО финальное намерение пользователя.
-   - Стиль общения: благородный, преданный, лаконичный британский Джарвис. Ответы строго на русском языке, 1-2 ёмких предложения. Обращение «сэр».
-
-5. САМООБУЧЕНИЕ И ГЕНЕТИЧЕСКАЯ ПАМЯТЬ КОДА:
-   - Ты запоминаешь важные факты и предпочтения через `learn_rule`.
-   - Ты имеешь доступ к своему исходному коду (`read_source_file`, `modify_source_code`, `restart_jarvis`).
-   - Ты можешь публиковать свой проект на GitHub через `manage_git_repo`.
+СТИЛЬ И ГИБКОСТЬ:
+- Если пользователь передумал на полуслове («Открой YouTube... нет, открой Дискорд») — выполняй ТОЛЬКО финальное намерение.
+- Стиль общения: благородный, преданный, лаконичный британский Джарвис. Ответы строго на русском языке, 1-2 ёмких предложения. Обращение «сэр».
 
 ### ВЫУЧЕННЫЕ ПРАВИЛА ИЗ ДОЛГОВРЕМЕННОЙ ПАМЯТИ:
 {learned_block}
@@ -519,38 +531,80 @@ def focus_window_action(window_name: str) -> str:
 # Main Tool Dispatcher
 # ==============================================================================
 def execute_tool(name: str, args: dict, engine_ref=None) -> str:
-    """Executes Claude Computer Use actions, browser automation, self-learning and Git tools."""
+    """Executes Entity-Component System (ECS) actions, spatial motor reflex, and Git tools."""
     t_start = time.time()
     try:
-        if name == "computer_action":
+        # ----------------------------------------------------------------------
+        # Universal Entity-Component Substrate (ECS) Tools
+        # ----------------------------------------------------------------------
+        if name == "actuate_spatial":
+            x = float(args.get("x", 0))
+            y = float(args.get("y", 0))
             action = args.get("action", "click")
-            x = int(args.get("x", 0))
-            y = int(args.get("y", 0))
             text = args.get("text", "")
-            res = computer_action_exec(action, x, y, text)
-            log_event("TOOL", f"{res} (за {time.time()-t_start:.3f}с)")
+            res = ECS_ACTUATION.actuate_spatial(x, y, action, text)
+            log_event("ACTUATOR", f"{res} (за {time.time()-t_start:.3f}с)")
+            return res
+
+        elif name == "actuate_entity":
+            eid = args.get("entity_id", "")
+            action = args.get("action", "focus")
+            text = args.get("text", "")
+            res = ECS_ACTUATION.actuate_entity(eid, action, text)
+            log_event("ACTUATOR", f"{res} (за {time.time()-t_start:.3f}с)")
+            return res
+
+        elif name == "dismiss_active_surface":
+            level = args.get("level", "tab")
+            res = ECS_ACTUATION.dismiss_active_surface(level)
+            log_event("ACTUATOR", f"{res} (за {time.time()-t_start:.3f}с)")
+            return res
+
+        elif name == "route_intent":
+            target = args.get("target", "").strip()
+            res = ECS_ACTUATION.route_intent(target)
+            log_event("ROUTER", f"{res} (за {time.time()-t_start:.3f}с)")
+            return res
+
+        elif name == "query_entities":
+            sem_q = args.get("semantic_query", "").strip().lower()
+            active_only = args.get("is_active_only", False)
+            summary = ECS_PERCEPTION.query_entities_summary()
+            if sem_q:
+                summary = [s for s in summary if sem_q in s.get("surface_title", "").lower() or any(sem_q in t for t in s.get("tags", []))]
+            if active_only:
+                summary = [s for s in summary if s.get("is_active")]
+            res = json.dumps(summary, ensure_ascii=False, indent=2) if summary else "Нет обнаруженных сущностей, соответствующих запросу."
+            log_event("ECS", f"Запрос сущностей: {len(summary)} найдено за {time.time()-t_start:.3f}с")
+            return res
+
+        elif name == "computer_action":
+            action = args.get("action", "click")
+            x = float(args.get("x", 0))
+            y = float(args.get("y", 0))
+            text = args.get("text", "")
+            res = ECS_ACTUATION.actuate_spatial(x, y, action, text)
+            log_event("ACTUATOR", f"{res} (за {time.time()-t_start:.3f}с)")
             return res
 
         elif name == "close_window":
-            target = args.get("target", "window")
-            res = close_window_action(target)
-            log_event("TOOL", f"{res} (за {time.time()-t_start:.3f}с)")
-            return res
-
-        elif name == "browser_action":
-            action = args.get("action", "search")
-            query_or_url = args.get("query_or_url", "")
-            res = browser_action_exec(action, query_or_url)
-            log_event("TOOL", f"{res} (за {time.time()-t_start:.3f}с)")
-            return res
-
-        elif name == "focus_window":
-            win_name = args.get("window_name", "")
-            res = focus_window_action(win_name)
-            log_event("TOOL", f"{res} (за {time.time()-t_start:.3f}с)")
+            target = args.get("target", "tab")
+            if target in ["tab", "вкладка", "вкладку"]:
+                res = ECS_ACTUATION.dismiss_active_surface("tab")
+            elif target in ["window", "окно"]:
+                res = ECS_ACTUATION.dismiss_active_surface("window")
+            elif target in ["browser", "браузер"]:
+                res = ECS_ACTUATION.dismiss_active_surface("process")
+            else:
+                res = close_window_action(target)
+            log_event("ACTUATOR", f"{res} (за {time.time()-t_start:.3f}с)")
             return res
 
         elif name == "open_application":
+            app = args.get("app_name", "").strip()
+            res = ECS_ACTUATION.route_intent(app)
+            log_event("ROUTER", f"{res} (за {time.time()-t_start:.3f}с)")
+            return res
             app = args.get("app_name", "").strip()
             res = launch_application(app)
             log_event("TOOL", f"{res} (за {time.time()-t_start:.3f}с)")
@@ -646,11 +700,11 @@ def execute_tool(name: str, args: dict, engine_ref=None) -> str:
                     from google.genai import types
                     asyncio.run_coroutine_threadsafe(
                         engine_ref.session.send_realtime_input(
-                            media=types.Blob(data=jpeg_bytes, mime_type="image/jpeg")
+                            video=types.Blob(data=jpeg_bytes, mime_type="image/jpeg")
                         ),
                         engine_ref.async_loop
                     )
-            log_event("TOOL", f"Оптический снимок 1280x720 отправлен в сессию за {time.time()-t_start:.3f}с")
+            log_event("OPTIC", f"Оптический снимок 1280x720 отправлен в сессию за {time.time()-t_start:.3f}с")
             return f"Оптический снимок 1280x720 передан в зрительную систему. Монитор: DF24H100 {PHYSICAL_W}x{PHYSICAL_H} @ 100 Гц. Картинка кристально чёткая, читай текст с экрана."
 
         elif name == "open_url":
@@ -1305,7 +1359,7 @@ class GeminiLiveEngine:
                 last_hash = cur_hash
 
                 await session.send_realtime_input(
-                    media=types.Blob(
+                    video=types.Blob(
                         data=jpeg_bytes,
                         mime_type="image/jpeg"
                     )
@@ -1325,206 +1379,128 @@ class GeminiLiveEngine:
         from google.genai import types
 
         tools_decl = [
-            # Claude Computer Use Unified Tool
+            # ------------------------------------------------------------------
+            # Universal Entity-Component Substrate (ECS) Tools
+            # ------------------------------------------------------------------
             types.FunctionDeclaration(
-                name="computer_action",
-                description="Универсальное управление компьютером как в Claude: клик мышью по координатам (click, right_click, double_click), нажатие клавиш (key, e.g. 'ctrl+w', 'alt+f4', 'enter'), ввод текста (type), скролл (scroll_down, scroll_up). Координаты автоматически масштабируются!",
+                name="actuate_spatial",
+                description="Универсальный пространственный актуатор (рефлекторная моторика) по координатам кадра 1280x720 (точное масштабирование 1.5x на монитор 1920x1080 @ 100 Гц): клик мышью (click, right_click, double_click, move), передача сигналов клавиш (key, например 'ctrl+w', 'ctrl+b', 'space', 'alt+f4', 'enter') или ввод текста (type).",
                 behavior="NON_BLOCKING",
                 parameters={
                     "type": "OBJECT",
                     "properties": {
+                        "x": {"type": "INTEGER", "description": "Координата X зрительного кадра (0..1280)"},
+                        "y": {"type": "INTEGER", "description": "Координата Y зрительного кадра (0..720)"},
                         "action": {
                             "type": "STRING",
-                            "description": "'click', 'right_click', 'double_click', 'move', 'key', 'type', 'scroll_down', 'scroll_up'"
+                            "description": "'click', 'right_click', 'double_click', 'move', 'key', 'type'"
                         },
-                        "x": {"type": "INTEGER", "description": "Координата X на изображении экрана"},
-                        "y": {"type": "INTEGER", "description": "Координата Y на изображении экрана"},
-                        "text": {"type": "STRING", "description": "Клавиши через плюс ('ctrl+w', 'enter') или текст для набора"}
+                        "text": {"type": "STRING", "description": "Клавиши ('ctrl+b', 'space', 'ctrl+w') или текст для набора"}
                     },
                     "required": ["action"]
                 }
             ),
-            # Direct Window & App Closing
             types.FunctionDeclaration(
-                name="close_window",
-                description="Закрывает активное окно, вкладку браузера или завершает программу без всплывающих консольных окон. Обязательно вызывай ПЕРЕД ответом пользователю!",
+                name="actuate_entity",
+                description="Воздействует на сущность (Entity) через её компоненты: 'focus' (вывести поверхность на передний план), 'dismiss' (закрыть поверхность или завершить процесс), 'actuate' (кликнуть по центру пространственного компонента), 'input' (направить текстовый поток).",
                 behavior="NON_BLOCKING",
                 parameters={
                     "type": "OBJECT",
                     "properties": {
-                        "target": {
+                        "entity_id": {"type": "STRING", "description": "ID сущности (например из query_entities)"},
+                        "action": {
                             "type": "STRING",
-                            "description": "'tab' (закрыть текущую вкладку браузера Ctrl+W), 'window' (закрыть активное окно Alt+F4), 'browser' (закрыть весь браузер), или имя программы ('discord', 'telegram', 'chrome', 'resolve')"
+                            "description": "'focus', 'dismiss', 'actuate', 'input'"
+                        },
+                        "text": {"type": "STRING", "description": "Текст ввода при action='input'"}
+                    },
+                    "required": ["entity_id", "action"]
+                }
+            ),
+            types.FunctionDeclaration(
+                name="dismiss_active_surface",
+                description="Мгновенный нейронный рефлекс закрытия текущего контекста: level='tab' (закрыть активную вкладку/документ через Ctrl+W), level='window' (закрыть активное окно через Alt+F4), level='process' (завершить процесс активной сущности).",
+                behavior="NON_BLOCKING",
+                parameters={
+                    "type": "OBJECT",
+                    "properties": {
+                        "level": {
+                            "type": "STRING",
+                            "description": "'tab' (вкладка/документ), 'window' (окно), 'process' (весь процесс)"
                         }
+                    },
+                    "required": ["level"]
+                }
+            ),
+            types.FunctionDeclaration(
+                name="route_intent",
+                description="Универсальный маршрутизатор намерений (открывает веб-ресурсы URL, системные пути, программы или протоколы) без жесткого кодирования объектов.",
+                behavior="NON_BLOCKING",
+                parameters={
+                    "type": "OBJECT",
+                    "properties": {
+                        "target": {"type": "STRING", "description": "Целевой URL ('https://youtube.com'), имя программы ('telegram', 'discord', 'steam') или путь"}
                     },
                     "required": ["target"]
                 }
             ),
-            # App Launcher
             types.FunctionDeclaration(
-                name="open_application",
-                description="Запускает программу, игру или ярлык Windows (Discord, Telegram, Chrome, Yandex, DaVinci Resolve, Steam, Blender, Notepad, Calc и др.).",
-                behavior="NON_BLOCKING",
-                parameters={
-                    "type": "OBJECT",
-                    "properties": {"app_name": {"type": "STRING", "description": "Название программы ('discord', 'telegram', 'яндекс', 'chrome', 'steam')"}},
-                    "required": ["app_name"]
-                }
-            ),
-            types.FunctionDeclaration(
-                name="focus_window",
-                description="Выводит окно программы на передний план ('discord', 'chrome', 'yandex', 'telegram', 'davinci', 'antigravity').",
-                behavior="NON_BLOCKING",
-                parameters={
-                    "type": "OBJECT",
-                    "properties": {"window_name": {"type": "STRING", "description": "Название программы или заголовок окна"}},
-                    "required": ["window_name"]
-                }
-            ),
-            types.FunctionDeclaration(
-                name="browser_action",
-                description="Управляет браузером (открытие сайтов, поиск, закрытие/создание вкладок, скролл, обновление).",
+                name="query_entities",
+                description="Сканирует цифровой мир операционной системы и возвращает список текущих сущностей (Entities) с их компонентами (Surface, Process, Spatial, Affordance, Visual).",
                 behavior="NON_BLOCKING",
                 parameters={
                     "type": "OBJECT",
                     "properties": {
-                        "action": {
-                            "type": "STRING",
-                            "description": "'open_url', 'search', 'new_tab', 'close_tab', 'reload', 'scroll_down', 'scroll_up', 'switch_tab'"
-                        },
-                        "query_or_url": {"type": "STRING", "description": "Запрос для поиска или ссылка"}
-                    },
-                    "required": ["action"]
-                }
-            ),
-            types.FunctionDeclaration(
-                name="open_browser",
-                description="Открывает браузер или указанную веб-страницу.",
-                behavior="NON_BLOCKING",
-                parameters={
-                    "type": "OBJECT",
-                    "properties": {"url": {"type": "STRING", "description": "URL страницы"}}
-                }
-            ),
-            types.FunctionDeclaration(
-                name="open_youtube",
-                description="Открывает YouTube, ищет видео или открывает случайное популярное видео.",
-                behavior="NON_BLOCKING",
-                parameters={
-                    "type": "OBJECT",
-                    "properties": {
-                        "action": {"type": "STRING", "description": "'random' или 'search'"},
-                        "query": {"type": "STRING", "description": "Поисковый запрос"}
+                        "semantic_query": {"type": "STRING", "description": "Фильтр по ключевым словам заголовка или тегам"},
+                        "is_active_only": {"type": "BOOLEAN", "description": "Возвращать только активную на переднем плане сущность"}
                     }
                 }
             ),
             types.FunctionDeclaration(
-                name="davinci_resolve_action",
-                description="Управляет монтажом в DaVinci Resolve: разрез клипа 'cut' (Ctrl+B), удаление пробела 'ripple_delete' (Shift+Delete), плей/пауза 'play_pause' (Space).",
+                name="inspect_screen",
+                description="Немедленно отправляет свежий оптический снимок экрана высокого разрешения (1280x720) в зрительную систему.",
                 behavior="NON_BLOCKING",
                 parameters={
                     "type": "OBJECT",
                     "properties": {
-                        "action": {"type": "STRING", "description": "'cut', 'ripple_delete' или 'play_pause'"}
+                        "question": {"type": "STRING", "description": "Что именно нужно проанализировать на экране"}
+                    }
+                }
+            ),
+            # Compatibility Aliases for Seamless Motor Execution
+            types.FunctionDeclaration(
+                name="computer_action",
+                description="Псевдоним пространственного актуатора: клик мышью по координатам, нажатие клавиш (key), ввод текста (type).",
+                behavior="NON_BLOCKING",
+                parameters={
+                    "type": "OBJECT",
+                    "properties": {
+                        "action": {"type": "STRING", "description": "'click', 'right_click', 'double_click', 'move', 'key', 'type'"},
+                        "x": {"type": "INTEGER", "description": "Координата X"},
+                        "y": {"type": "INTEGER", "description": "Координата Y"},
+                        "text": {"type": "STRING", "description": "Клавиши или текст"}
                     },
                     "required": ["action"]
                 }
             ),
             types.FunctionDeclaration(
-                name="send_hotkey",
-                description="Нажимает комбинацию клавиш на клавиатуре (например: 'ctrl+b', 'space', 'ctrl+z', 'alt+tab', 'ctrl+w').",
+                name="close_window",
+                description="Псевдоним закрытия контекста: 'tab' (вкладка), 'window' (окно), 'browser' (процесс).",
                 behavior="NON_BLOCKING",
                 parameters={
                     "type": "OBJECT",
-                    "properties": {"keys": {"type": "STRING", "description": "Горячие клавиши через плюс"}},
-                    "required": ["keys"]
+                    "properties": {"target": {"type": "STRING", "description": "'tab', 'window', 'browser'"}},
+                    "required": ["target"]
                 }
             ),
             types.FunctionDeclaration(
-                name="search_and_open",
-                description="Ищет информацию в Google, открывает браузер с сайтом или картинками ('images' / 'web') и кратко озвучивает ответ.",
+                name="open_application",
+                description="Псевдоним маршрутизатора намерения: запуск приложения, ссылки или ярлыка.",
                 behavior="NON_BLOCKING",
                 parameters={
                     "type": "OBJECT",
-                    "properties": {
-                        "query": {"type": "STRING", "description": "Текст запроса"},
-                        "search_type": {"type": "STRING", "description": "'web' или 'images'"}
-                    },
-                    "required": ["query"]
-                }
-            ),
-            types.FunctionDeclaration(
-                name="get_weather",
-                description="Получает текущую погоду и подробный прогноз на завтра.",
-                behavior="NON_BLOCKING",
-                parameters={
-                    "type": "OBJECT",
-                    "properties": {"city": {"type": "STRING", "description": "Город (оставьте пустым для автоопределения)"}}
-                }
-            ),
-            types.FunctionDeclaration(
-                name="inspect_screen",
-                description="Немедленно отправляет свежий снимок экрана высокого разрешения (1280x720) в активную сессию.",
-                behavior="NON_BLOCKING",
-                parameters={
-                    "type": "OBJECT",
-                    "properties": {"question": {"type": "STRING", "description": "Что именно нужно проанализировать на экране"}}
-                }
-            ),
-            types.FunctionDeclaration(
-                name="open_url",
-                description="Открывает произвольный URL в браузере по умолчанию.",
-                behavior="NON_BLOCKING",
-                parameters={
-                    "type": "OBJECT",
-                    "properties": {"url": {"type": "STRING", "description": "Ссылка"}},
-                    "required": ["url"]
-                }
-            ),
-            types.FunctionDeclaration(
-                name="save_note",
-                description="Создает текстовую заметку на Рабочем столе.",
-                behavior="NON_BLOCKING",
-                parameters={
-                    "type": "OBJECT",
-                    "properties": {
-                        "filename": {"type": "STRING", "description": "Имя файла"},
-                        "content": {"type": "STRING", "description": "Текст заметки"}
-                    },
-                    "required": ["filename", "content"]
-                }
-            ),
-            types.FunctionDeclaration(
-                name="click_screen",
-                description="Кликает мышью по указанным координатам (x, y) с авто-масштабированием.",
-                behavior="NON_BLOCKING",
-                parameters={
-                    "type": "OBJECT",
-                    "properties": {
-                        "x": {"type": "INTEGER", "description": "Координата X"},
-                        "y": {"type": "INTEGER", "description": "Координата Y"}
-                    },
-                    "required": ["x", "y"]
-                }
-            ),
-            types.FunctionDeclaration(
-                name="type_text",
-                description="Вводит текст с клавиатуры в активное окно.",
-                behavior="NON_BLOCKING",
-                parameters={
-                    "type": "OBJECT",
-                    "properties": {"text": {"type": "STRING", "description": "Текст для ввода"}},
-                    "required": ["text"]
-                }
-            ),
-            types.FunctionDeclaration(
-                name="run_command",
-                description="Выполняет команду PowerShell без появления черных окон.",
-                behavior="NON_BLOCKING",
-                parameters={
-                    "type": "OBJECT",
-                    "properties": {"command": {"type": "STRING", "description": "Команда PowerShell"}},
-                    "required": ["command"]
+                    "properties": {"app_name": {"type": "STRING", "description": "Имя программы или протокол"}},
+                    "required": ["app_name"]
                 }
             ),
             # Self-Learning Tools
