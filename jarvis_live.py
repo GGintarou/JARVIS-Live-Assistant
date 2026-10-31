@@ -1270,8 +1270,8 @@ class ArcReactorWidget(QWidget):
         for i in range(12):
             painter.drawArc(-48, -48, 96, 96, int(i * 30 * 16 + 4 * 16), int(22 * 16))
 
-        # Radar sweep animation
-        if self.state == "VISION" or self.screen_vision_enabled:
+        # Radar sweep animation (only during active conversation or active vision)
+        if self.state != "STANDBY" and (self.state == "VISION" or self.screen_vision_enabled):
             radar_grad = QConicalGradient(0, 0, self.radar_angle)
             radar_grad.setColorAt(0.0, QColor(accent.red(), accent.green(), accent.blue(), 80))
             radar_grad.setColorAt(0.20, QColor(accent.red(), accent.green(), accent.blue(), 15))
@@ -1786,12 +1786,14 @@ class GeminiLiveEngine:
                 pcm_bytes = chunk.tobytes()
 
                 if rms > threshold:
-                    norm_level = min((rms - threshold) / 1200.0, 1.0)
-                    self.avatar.update_voice_level(norm_level)
+                    if self.wake_state == "ACTIVE":
+                        norm_level = min((rms - threshold) / 1200.0, 1.0)
+                        self.avatar.update_voice_level(norm_level)
 
                     if not is_speaking_user:
                         is_speaking_user = True
-                        self.avatar.set_state("LISTENING")
+                        if self.wake_state == "ACTIVE":
+                            self.avatar.set_state("LISTENING")
                         speech_chunks = list(pre_buffer)
                         log_event("VAD", f"Пользователь начал говорить (RMS: {rms:.1f})")
 
@@ -1799,7 +1801,8 @@ class GeminiLiveEngine:
                     silence_start_time = now
 
                 else:
-                    self.avatar.update_voice_level(0.0)
+                    if self.wake_state == "ACTIVE":
+                        self.avatar.update_voice_level(0.0)
                     if is_speaking_user:
                         speech_chunks.append(pcm_bytes)
                         if now - silence_start_time >= SILENCE_TIMEOUT:
@@ -1878,7 +1881,10 @@ class GeminiLiveEngine:
                     if getattr(server_content, "interrupted", False):
                         log_event("GEMINI", "Перебивание пользователем: сброс аудио")
                         self._clear_playback_queue()
-                        self.avatar.set_state("LISTENING")
+                        target = "ACTIVE" if self.wake_state == "ACTIVE" else "STANDBY"
+                        remaining = max(0, int(self.active_until - time.time()))
+                        subtext = f"● НА СВЯЗИ ({remaining}с)" if self.wake_state == "ACTIVE" else "💤 ЖДУ «ДЖАРВИС»"
+                        self.avatar.set_state(target, subtext)
 
                     if server_content.model_turn:
                         for part in server_content.model_turn.parts:
