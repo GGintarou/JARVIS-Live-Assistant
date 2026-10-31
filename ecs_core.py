@@ -3,7 +3,7 @@ import os
 import pathlib
 
 # Ensure virtualenv site-packages are loaded
-WORK_DIR = pathlib.Path(r"C:\Users\proko\.gemini\antigravity\scratch\jarvis_live")
+WORK_DIR = pathlib.Path(__file__).resolve().parent
 venv_site = WORK_DIR / ".venv" / "Lib" / "site-packages"
 if venv_site.exists() and str(venv_site) not in sys.path:
     sys.path.insert(0, str(venv_site))

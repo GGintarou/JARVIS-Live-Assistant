@@ -3,7 +3,7 @@ import sys
 import pathlib
 
 # Ensure virtualenv site-packages are loaded immediately before third-party imports
-WORK_DIR = pathlib.Path(r"C:\Users\proko\.gemini\antigravity\scratch\jarvis_live")
+WORK_DIR = pathlib.Path(__file__).resolve().parent
 venv_site = WORK_DIR / ".venv" / "Lib" / "site-packages"
 if venv_site.exists() and str(venv_site) not in sys.path:
     sys.path.insert(0, str(venv_site))
@@ -44,7 +44,6 @@ ECS_PERCEPTION = ecs_core.PerceptionSystem(ECS_EM)
 ECS_ACTUATION = ecs_core.ActuationSystem(ECS_EM)
 
 # Set working directory to project location
-WORK_DIR = pathlib.Path(r"C:\Users\proko\.gemini\antigravity\scratch\jarvis_live")
 if not WORK_DIR.exists():
     WORK_DIR.mkdir(parents=True, exist_ok=True)
 os.chdir(str(WORK_DIR))
