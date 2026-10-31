@@ -300,6 +300,8 @@ def get_dynamic_system_prompt() -> str:
    - Если пользователь говорит «включи музыку», «включи фонк», «поставь песню» — вызывай `play_music(query=...)`.
 4. СООБЩЕНИЯ В TELEGRAM: `send_telegram_message(recipient='Имя друга', text='Текст')`.
    - Если пользователь просит отправить сообщение («напиши [Имя] в Телеграме [сообщение]») — вызывай `send_telegram_message`.
+   - Если инструмент возвращает ошибку или чат не удалось открыть — честно доложи об этом сэру, КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО говорить, что сообщение отправлено, если инструмент вернул сбой.
+   - Если пользователь спрашивает «что последнее отправлено в чате» — вызови `inspect_screen()` и прочитай реальный последний текст на экране.
 5. ПРОГНОЗ ПОГОДЫ: `get_weather(city='...')`.
    - Если пользователь спрашивает «какая погода?» — вызывай `get_weather`.
 6. ПРОСТРАНСТВЕННАЯ МОТОРИКА: `actuate_spatial(x, y, action='click'|'right_click'|'double_click'|'key'|'type', text='...')`.
@@ -601,36 +603,52 @@ def send_telegram_message_action(recipient: str, text: str) -> str:
     """Finds/focuses Telegram, searches for recipient, and sends message text."""
     try:
         import pyperclip
-        t_app = ecs_core.find_windows_app("telegram")
-        if t_app:
-            try:
-                os.startfile(t_app)
-                time.sleep(0.4)
-            except Exception:
-                pass
-
-        for win in pyautogui.getAllWindows():
-            if "telegram" in win.title.lower():
+        # 1. Bring Telegram window to foreground
+        focused = ecs_core.focus_window_by_process("telegram")
+        if not focused:
+            # If not already focused or running, try launching it
+            t_app = ecs_core.find_windows_app("telegram")
+            if t_app:
                 try:
-                    win.activate()
-                    time.sleep(0.2)
+                    os.startfile(t_app)
+                    time.sleep(1.0)
+                    focused = ecs_core.focus_window_by_process("telegram")
                 except Exception:
                     pass
-                break
 
-        pyautogui.hotkey("ctrl", "k")
-        time.sleep(0.15)
-        pyperclip.copy(recipient)
-        pyautogui.hotkey("ctrl", "v")
-        time.sleep(0.35)
-        pyautogui.press("enter")
+        if not focused:
+            return f"Ошибка: не удалось найти или активировать окно Telegram для отправки сообщения '{recipient}'."
+
         time.sleep(0.3)
-
-        pyperclip.copy(text)
+        # 2. Focus search bar in Telegram Desktop:
+        # Press Escape first to clear any open media/dialog
+        pyautogui.press("escape")
+        time.sleep(0.12)
+        # Ctrl+K (or Ctrl+F) activates global search in Telegram Desktop
+        pyautogui.hotkey("ctrl", "k")
+        time.sleep(0.18)
+        # Clear previous search query
+        pyautogui.hotkey("ctrl", "a")
+        time.sleep(0.06)
+        # Paste recipient
+        pyperclip.copy(recipient)
+        time.sleep(0.06)
         pyautogui.hotkey("ctrl", "v")
-        time.sleep(0.15)
+        # Give Telegram search 0.65s to populate and select top contact
+        time.sleep(0.65)
+        # Press Enter to open the matching chat
         pyautogui.press("enter")
-        return f"Сообщение '{text}' успешно отправлено в Telegram получателю '{recipient}'."
+        time.sleep(0.4)
+
+        # 3. Paste and send message
+        pyperclip.copy(text)
+        time.sleep(0.06)
+        pyautogui.hotkey("ctrl", "v")
+        time.sleep(0.2)
+        pyautogui.press("enter")
+        time.sleep(0.2)
+
+        return f"В Telegram успешно открыт диалог с '{recipient}' и отправлено сообщение: «{text}»."
     except Exception as e:
         return f"Ошибка отправки сообщения в Telegram: {e}"
 
@@ -1140,20 +1158,32 @@ class ArcReactorWidget(QWidget):
         self.anim_timer.start(33)
 
     def _apply_state(self, new_state: str, subtext: str = ""):
-        if self.state != new_state or self.custom_subtext != subtext:
-            self.state = new_state
-            self.custom_subtext = subtext
-            self.update()
+        try:
+            if self.state != new_state or self.custom_subtext != subtext:
+                self.state = new_state
+                self.custom_subtext = subtext
+                self.update()
+        except RuntimeError:
+            pass
 
     def set_state(self, new_state: str, subtext: str = ""):
-        self.sig_set_state.emit(new_state, subtext)
+        try:
+            self.sig_set_state.emit(new_state, subtext)
+        except RuntimeError:
+            pass
 
     def _apply_voice_level(self, level: float):
-        self.voice_level = 0.65 * self.voice_level + 0.35 * min(max(level, 0.0), 1.0)
-        self.update()
+        try:
+            self.voice_level = 0.65 * self.voice_level + 0.35 * min(max(level, 0.0), 1.0)
+            self.update()
+        except RuntimeError:
+            pass
 
     def update_voice_level(self, level: float):
-        self.sig_set_voice_level.emit(level)
+        try:
+            self.sig_set_voice_level.emit(level)
+        except RuntimeError:
+            pass
 
     def update_animation(self):
         self.core_pulse += 0.08

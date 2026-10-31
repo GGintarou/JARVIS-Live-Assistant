@@ -426,6 +426,114 @@ class ActuationSystem:
                     return f"Ошибка завершения процесса: {e}"
         return f"Неизвестный уровень закрытия: {level}"
 
+    def route_intent(self, target: str) -> str:
+        """Universal Intent Router (URLs, applications, paths, system protocols)."""
+        t = target.strip()
+        # 1. Web URI
+        if t.startswith(("http://", "https://")) or ("." in t and not " " in t and not "\\" in t and "/" in t):
+            url = t if t.startswith("http") else "https://" + t
+            os.startfile(url)
+            return f"Маршрутизация намерения: открыт веб-ресурс {url}."
+
+        # 2. If application is already open, focus its window directly!
+        if focus_window_by_process(t):
+            return f"Маршрутизация намерения: приложение '{t}' уже запущено и выведено на передний план."
+
+        # 3. Windows Applications & Shortcuts resolver
+        resolved = find_windows_app(t)
+        if resolved:
+            try:
+                os.startfile(resolved)
+                return f"Маршрутизация намерения: успешно запущено приложение '{t}' ({resolved})."
+            except Exception:
+                pass
+
+        # 4. File system path
+        if os.path.exists(t):
+            os.startfile(t)
+            return f"Маршрутизация намерения: открыт системный ресурс {t}."
+
+        # 5. System start resolution
+        try:
+            os.startfile(t)
+            return f"Маршрутизация намерения: активирован системный протокол {t}."
+        except Exception:
+            try:
+                import subprocess
+                subprocess.Popen(f"start {t}", shell=True, creationflags=0x08000000)
+                return f"Маршрутизация намерения: передан вызов оболочке для '{t}'."
+            except Exception as e:
+                return f"Не удалось маршрутизировать намерение '{t}': {e}"
+
+def focus_window_by_process(app_name: str) -> bool:
+    """Finds any running process matching app_name and brings its top-level window to foreground."""
+    clean = app_name.lower().strip()
+    aliases = {
+        "телеграм": "telegram", "телега": "telegram", "тг": "telegram",
+        "дискорд": "discord", "диск": "discord",
+        "яндекс": "yandex", "браузер": "browser", "хром": "chrome",
+        "стим": "steam", "давинчи": "resolve"
+    }
+    target = aliases.get(clean, clean)
+    target_pids = set()
+    for p in psutil.process_iter(['pid', 'name']):
+        try:
+            p_name = p.info['name'].lower()
+            if target in p_name:
+                target_pids.add(p.info['pid'])
+        except Exception:
+            continue
+
+    if not target_pids:
+        return False
+
+    try:
+        hwinsta = user32.OpenWindowStationW("WinSta0", False, 0x37F)
+        if hwinsta:
+            user32.SetProcessWindowStation(hwinsta)
+            hdesk = user32.OpenDesktopW("Default", 0, False, 0x1FF)
+            if hdesk:
+                user32.SetThreadDesktop(hdesk)
+    except Exception:
+        pass
+
+    found_hwnds = []
+    def enum_proc(hwnd, _):
+        pid = wintypes.DWORD()
+        user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+        if pid.value in target_pids:
+            vis = user32.IsWindowVisible(hwnd)
+            cls_buf = ctypes.create_unicode_buffer(256)
+            user32.GetClassNameW(hwnd, cls_buf, 256)
+            cls = cls_buf.value
+            length = user32.GetWindowTextLengthW(hwnd)
+            buf = ctypes.create_unicode_buffer(length + 1)
+            if length > 0:
+                user32.GetWindowTextW(hwnd, buf, length + 1)
+            title = buf.value
+            if "message" not in cls.lower() and "observer" not in cls.lower() and cls not in ["IME", "MSCTFIME UI"]:
+                found_hwnds.append((hwnd, vis, title, cls))
+        return True
+
+    cb = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)(enum_proc)
+    user32.EnumWindows(cb, 0)
+
+    found_hwnds.sort(key=lambda x: 0 if x[1] else 1)
+
+    for hwnd, vis, title, cls in found_hwnds:
+        try:
+            user32.ShowWindow(hwnd, 9)  # SW_RESTORE
+            user32.ShowWindow(hwnd, 5)  # SW_SHOW
+            user32.BringWindowToTop(hwnd)
+            user32.keybd_event(0x12, 0, 0, 0)
+            user32.SetForegroundWindow(hwnd)
+            user32.keybd_event(0x12, 0, 2, 0)
+            time.sleep(0.08)
+            return True
+        except Exception:
+            pass
+    return False
+
 def find_windows_app(name: str) -> Optional[str]:
     """Finds installed application executable or shortcut across Windows."""
     name_clean = name.lower().strip()
@@ -482,39 +590,9 @@ def find_windows_app(name: str) -> Optional[str]:
 
     return None
 
-    def route_intent(self, target: str) -> str:
-        """Universal Intent Router (URLs, applications, paths, system protocols)."""
-        t = target.strip()
-        # 1. Web URI
-        if t.startswith(("http://", "https://")) or ("." in t and not " " in t and not "\\" in t and "/" in t):
-            url = t if t.startswith("http") else "https://" + t
-            os.startfile(url)
-            return f"Маршрутизация намерения: открыт веб-ресурс {url}."
+def route_intent(target: str) -> str:
+    """Module-level intent routing."""
+    return ActuationSystem(None).route_intent(target)
 
-        # 2. Windows Applications & Shortcuts resolver
-        resolved = find_windows_app(t)
-        if resolved:
-            try:
-                os.startfile(resolved)
-                return f"Маршрутизация намерения: успешно запущено приложение '{t}' ({resolved})."
-            except Exception:
-                pass
-
-        # 3. File system path
-        if os.path.exists(t):
-            os.startfile(t)
-            return f"Маршрутизация намерения: открыт системный ресурс {t}."
-
-        # 4. System start resolution
-        try:
-            os.startfile(t)
-            return f"Маршрутизация намерения: активирован системный протокол {t}."
-        except Exception:
-            try:
-                import subprocess
-                subprocess.Popen(f"start {t}", shell=True, creationflags=0x08000000)
-                return f"Маршрутизация намерения: передан вызов оболочке для '{t}'."
-            except Exception as e:
-                return f"Не удалось маршрутизировать намерение '{t}': {e}"
 
 print("ECS Data structures initialized successfully.")
