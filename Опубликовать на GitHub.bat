@@ -1,34 +1,38 @@
 @echo off
-chcp 65001 >nul
-title Публикация JARVIS Live Assistant на GitHub
-cd /d "%~dp0"
+title JARVIS GitHub Publisher
 cls
-echo ======================================================================
-echo    J.A.R.V.I.S. LIVE ASSISTANT — СИНХРОНИЗАЦИЯ С GITHUB
-echo    Репозиторий: https://github.com/GGintarou/JARVIS-Live-Assistant
-echo ======================================================================
+echo ========================================================
+echo   J.A.R.V.I.S. LIVE ASSISTANT - GITHUB SYNC
+echo   Target: https://github.com/GGintarou/JARVIS-Live-Assistant
+echo ========================================================
 echo.
-echo Отправляем ветку main на GitHub...
-echo (Если откроется окно браузера или Git Credential Manager,
-echo  нажмите «Sign in with your browser» для подтверждения авторизации)
+
+cd /d "%~dp0"
+
+echo Current directory:
+cd
+echo.
+echo Checking Git status:
+git status --short
+echo.
+echo ========================================================
+echo Pushing 'main' branch to GitHub...
+echo (If Git Credential Manager prompts you, click 'Sign in with browser')
+echo ========================================================
 echo.
 
 git push -u origin main
 
+echo.
 if %errorlevel% equ 0 (
-    echo.
-    echo ======================================================================
-    echo   [УСПЕШНО] Все файлы, документация и картинки загружены на GitHub!
-    echo   Ссылка на репозиторий:
-    echo   https://github.com/GGintarou/JARVIS-Live-Assistant
-    echo ======================================================================
+    echo ========================================================
+    echo [SUCCESS] JARVIS successfully published to GitHub!
+    echo URL: https://github.com/GGintarou/JARVIS-Live-Assistant
+    echo ========================================================
 ) else (
-    echo.
-    echo ======================================================================
-    echo   [ОШИБКА] Не удалось выполнить отправку.
-    echo   Проверьте интернет-соединение или авторизацию GitHub.
-    echo ======================================================================
+    echo ========================================================
+    echo [ERROR] Push failed with error code %errorlevel%.
+    echo ========================================================
 )
-
 echo.
 pause

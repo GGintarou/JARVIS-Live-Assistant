@@ -1,30 +1,38 @@
 @echo off
-chcp 65001 >nul
-title Push JARVIS Live Assistant to GitHub
-cd /d "%~dp0"
+title JARVIS GitHub Publisher
 cls
-echo ======================================================================
-echo    J.A.R.V.I.S. LIVE ASSISTANT - GITHUB SYNC
-echo    Repository: https://github.com/GGintarou/JARVIS-Live-Assistant
-echo ======================================================================
+echo ========================================================
+echo   J.A.R.V.I.S. LIVE ASSISTANT - GITHUB SYNC
+echo   Target: https://github.com/GGintarou/JARVIS-Live-Assistant
+echo ========================================================
 echo.
-echo Pushing branch 'main' to GitHub...
+
+cd /d "%~dp0"
+
+echo Current directory:
+cd
+echo.
+echo Checking Git status:
+git status --short
+echo.
+echo ========================================================
+echo Pushing 'main' branch to GitHub...
+echo (If Git Credential Manager prompts you, click 'Sign in with browser')
+echo ========================================================
 echo.
 
 git push -u origin main
 
+echo.
 if %errorlevel% equ 0 (
-    echo.
-    echo ======================================================================
-    echo   [SUCCESS] All files, documentation and HUD assets published!
-    echo   Repository URL: https://github.com/GGintarou/JARVIS-Live-Assistant
-    echo ======================================================================
+    echo ========================================================
+    echo [SUCCESS] JARVIS successfully published to GitHub!
+    echo URL: https://github.com/GGintarou/JARVIS-Live-Assistant
+    echo ========================================================
 ) else (
-    echo.
-    echo ======================================================================
-    echo   [ERROR] Push failed. Please check your GitHub authorization.
-    echo ======================================================================
+    echo ========================================================
+    echo [ERROR] Push failed with error code %errorlevel%.
+    echo ========================================================
 )
-
 echo.
 pause
