@@ -175,6 +175,45 @@ def scale_mouse_coordinates(x: int | float, y: int | float) -> tuple[int, int]:
     return max(0, min(screen_w - 1, real_x)), max(0, min(screen_h - 1, real_y))
 
 # ==============================================================================
+# Offline Wake-Word Detection System (Vosk 16kHz Engine)
+# ==============================================================================
+class WakeWordDetector:
+    """
+    Offline local wake-word detector (~150ms latency, 0 tokens, 100% private).
+    Ensures Jarvis never reacts to Discord or background chatter unless addressed by name.
+    """
+    def __init__(self):
+        self.model = None
+        self.recognizer = None
+        self.is_ready = False
+        try:
+            import vosk
+            vosk.SetLogLevel(-1)
+            self.model = vosk.Model(lang="ru")
+            self.recognizer = vosk.KaldiRecognizer(self.model, 16000)
+            self.recognizer.SetWords(True)
+            self.is_ready = True
+            log_event("WAKE", "Локальный Vosk-детектор ключевого слова готов к работе.")
+        except Exception as e:
+            log_event("WAKE", f"Vosk недоступен: {e}. Будет использован фолбек через Gemini.")
+
+    def check_audio_for_wake_word(self, pcm_bytes: bytes) -> tuple[bool, str]:
+        if not self.is_ready or not self.recognizer:
+            return True, ""
+        try:
+            self.recognizer.Reset()
+            self.recognizer.AcceptWaveform(pcm_bytes)
+            res = json.loads(self.recognizer.Result())
+            text = (res.get("text") or "").lower().strip()
+            log_event("WAKE_RECOG", f"Локальное распознавание спящего режима: «{text}»")
+            wake_words = ["джарвис", "жарвис", "jarvis", "джарв", "дружище", "компьютер"]
+            has_wake = any(w in text for w in wake_words)
+            return has_wake, text
+        except Exception as e:
+            log_event("ERROR", f"Ошибка анализа ключевого слова: {e}")
+            return True, ""
+
+# ==============================================================================
 # Persistent Memory & Self-Learning System
 # ==============================================================================
 def load_memory() -> dict:
@@ -1000,7 +1039,7 @@ class ArcReactorWidget(QWidget):
         self.core_pulse = 0.0
         self.voice_level = 0.0
         self.state = "STANDBY"
-        self.custom_subtext = ""
+        self.custom_subtext = "💤 ЖДУ «ДЖАРВИС»"
         self.is_active = True
         self.screen_vision_enabled = CONFIG.get("screen_vision", True)
 
@@ -1043,8 +1082,12 @@ class ArcReactorWidget(QWidget):
             self.angle += 2.0
         elif self.state == "SPEAKING":
             self.angle += 3.5
-        else:
-            self.angle += 1.0
+        elif self.state == "ACTIVE":
+            self.angle += 2.0
+        elif self.state == "LISTENING":
+            self.angle += 3.0
+        else: # STANDBY
+            self.angle += 0.5
 
         if self.angle >= 360.0:
             self.angle -= 360.0
@@ -1168,9 +1211,15 @@ class ArcReactorWidget(QWidget):
         if self.state == "LISTENING":
             accent = QColor(0, 242, 254)         # Neon Cyan
             glow = QColor(0, 242, 254, 180)
-            status_text = "● СЛУШАЮ..."
+            status_text = self.custom_subtext if self.custom_subtext else "● СЛУШАЮ..."
             pill_border = QColor(0, 242, 254, 220)
             pill_bg = QColor(0, 30, 45, 230)
+        elif self.state == "ACTIVE":
+            accent = QColor(0, 242, 254)         # Neon Cyan Arc Reactor
+            glow = QColor(0, 242, 254, 160)
+            status_text = self.custom_subtext if self.custom_subtext else "● НА СВЯЗИ (60с)"
+            pill_border = QColor(0, 242, 254, 220)
+            pill_bg = QColor(0, 35, 50, 230)
         elif self.state == "VISION":
             accent = QColor(217, 70, 239)        # Ultraviolet/Magenta
             glow = QColor(217, 70, 239, 180)
@@ -1180,7 +1229,7 @@ class ArcReactorWidget(QWidget):
         elif self.state == "THINKING":
             accent = QColor(245, 158, 11)        # Solar Amber Turbine
             glow = QColor(245, 158, 11, 180)
-            status_text = "⏳ ОБРАБОТКА..."
+            status_text = self.custom_subtext if self.custom_subtext else "⏳ ОБРАБОТКА..."
             pill_border = QColor(245, 158, 11, 220)
             pill_bg = QColor(45, 25, 5, 230)
         elif self.state == "EXECUTING":
@@ -1195,12 +1244,12 @@ class ArcReactorWidget(QWidget):
             status_text = "🔊 ДЖАРВИС"
             pill_border = QColor(59, 130, 246, 220)
             pill_bg = QColor(10, 25, 50, 230)
-        else:
-            accent = QColor(14, 165, 233)        # Stealth Sky Blue
-            glow = QColor(14, 165, 233, 100)
-            status_text = "○ ДЖАРВИС"
-            pill_border = QColor(14, 165, 233, 160)
-            pill_bg = QColor(10, 20, 30, 220)
+        else: # STANDBY
+            accent = QColor(14, 165, 233)        # Stealth Sky Blue (peaceful sleep)
+            glow = QColor(14, 165, 233, 70)
+            status_text = self.custom_subtext if self.custom_subtext else "💤 ЖДУ «ДЖАРВИС»"
+            pill_border = QColor(14, 165, 233, 140)
+            pill_bg = QColor(10, 20, 30, 210)
 
         # Outer Holographic Ring
         painter.save()
@@ -1265,7 +1314,7 @@ class ArcReactorWidget(QWidget):
         painter.drawEllipse(int(center_x - core_r), int(center_y - core_r), core_r * 2, core_r * 2)
 
         # Futuristic Status Pill Badge
-        badge_w = 144
+        badge_w = 148
         badge_h = 26
         badge_x = int((self.width() - badge_w) / 2.0)
         badge_y = self.height() - badge_h - 10
@@ -1305,6 +1354,12 @@ class GeminiLiveEngine:
         self.turn_sent_time = 0.0
         self.async_loop = None
 
+        # Wake-Word & Active Conversation State (60s timer)
+        self.wake_detector = WakeWordDetector()
+        self.wake_state = "STANDBY"         # "STANDBY" (спит и фильтрует) или "ACTIVE" (на связи)
+        self.active_until = 0.0             # timestamp окончания активного режима
+        self.ACTIVE_DURATION = 60.0         # 60 секунд окна диалога после каждого обращения
+
         self.avatar.sig_interrupt.connect(self.trigger_interrupt)
 
     def trigger_interrupt(self):
@@ -1343,7 +1398,10 @@ class GeminiLiveEngine:
                     stream.write(audio_data)
                     if self.audio_out_queue.empty():
                         self.is_speaking = False
-                        self.avatar.set_state("STANDBY")
+                        target = "ACTIVE" if self.wake_state == "ACTIVE" else "STANDBY"
+                        remaining = max(0, int(self.active_until - time.time()))
+                        subtext = f"● НА СВЯЗИ ({remaining}с)" if self.wake_state == "ACTIVE" else "💤 ЖДУ «ДЖАРВИС»"
+                        self.avatar.set_state(target, subtext)
         except Exception as e:
             log_event("ERROR", f"Ошибка аудиовыхода: {e}")
 
@@ -1633,7 +1691,9 @@ class GeminiLiveEngine:
 
         while self.is_running:
             try:
-                self.avatar.set_state("STANDBY")
+                target = "ACTIVE" if self.wake_state == "ACTIVE" else "STANDBY"
+                subtext = f"● НА СВЯЗИ ({max(0, int(self.active_until - time.time()))}с)" if self.wake_state == "ACTIVE" else "💤 ЖДУ «ДЖАРВИС»"
+                self.avatar.set_state(target, subtext)
                 log_event("NET", f"Подключение к WebSocket {self.model}...")
                 t_conn = time.time()
 
@@ -1659,17 +1719,33 @@ class GeminiLiveEngine:
 
             except Exception as e:
                 log_event("NET", f"Соединение завершено: {e}. Быстрое переподключение...")
-                self.avatar.set_state("STANDBY")
+                self.avatar.set_state("STANDBY", "💤 ЖДУ «ДЖАРВИС»")
                 await asyncio.sleep(1.0)
 
     async def _watchdog_loop(self):
-        """Watchdog to automatically prevent infinite loading if server hangs."""
+        """Контролирует таймауты зависания и 60-секундный таймер активного диалога."""
         while self.is_running:
             await asyncio.sleep(0.5)
+            now = time.time()
+
+            # 1. Защита от зависания обработки
             if self.avatar.state == "THINKING":
-                if time.time() - self.turn_sent_time > 5.0:
-                    log_event("WATCHDOG", "Таймаут ожидания ответа (5с) -> сброс в режим ожидания")
-                    self.avatar.set_state("STANDBY")
+                if now - self.turn_sent_time > 6.0:
+                    log_event("WATCHDOG", "Таймаут ожидания ответа (6с) -> сброс состояния")
+                    target = "ACTIVE" if self.wake_state == "ACTIVE" else "STANDBY"
+                    subtext = f"● НА СВЯЗИ ({max(0, int(self.active_until - now))}с)" if self.wake_state == "ACTIVE" else "💤 ЖДУ «ДЖАРВИС»"
+                    self.avatar.set_state(target, subtext)
+
+            # 2. Обратный отсчет 60 секунд активного диалога
+            if self.wake_state == "ACTIVE":
+                remaining = int(self.active_until - now)
+                if remaining > 0:
+                    if self.avatar.state in ["STANDBY", "ACTIVE"] and not self.is_speaking:
+                        self.avatar.set_state("ACTIVE", f"● НА СВЯЗИ ({remaining}с)")
+                else:
+                    self.wake_state = "STANDBY"
+                    log_event("CONV", "Таймаут 60 секунд безмолвия. Джарвис уснул и ждет слова «Джарвис».")
+                    self.avatar.set_state("STANDBY", "💤 ЖДУ «ДЖАРВИС»")
 
     async def _vad_audio_loop(self, session):
         """Patient VAD (1.40s pause tolerance) with echo and overlap suppression."""
@@ -1734,12 +1810,39 @@ class GeminiLiveEngine:
 
                             if dur < MIN_SPEECH_DURATION:
                                 log_event("VAD", f"Фраза слишком короткая ({dur:.2f}с), фильтр шума.")
-                                self.avatar.set_state("STANDBY")
+                                target = "ACTIVE" if self.wake_state == "ACTIVE" else "STANDBY"
+                                remaining = max(0, int(self.active_until - now))
+                                subtext = f"● НА СВЯЗИ ({remaining}с)" if self.wake_state == "ACTIVE" else "💤 ЖДУ «ДЖАРВИС»"
+                                self.avatar.set_state(target, subtext)
                                 continue
 
+                            # --- Wake-Word & Active Conversation Filter ---
+                            if self.wake_state == "STANDBY":
+                                has_wake, recognized_text = self.wake_detector.check_audio_for_wake_word(user_audio_bytes)
+                                if not has_wake:
+                                    log_event("VAD", f"Спящий режим: реплика проигнорирована (нет слова «Джарвис»). Общение в Discord/комнате свободно.")
+                                    self.avatar.set_state("STANDBY", "💤 ЖДУ «ДЖАРВИС»")
+                                    continue
+                                else:
+                                    log_event("VAD", f"⚡ АКТИВАЦИЯ! Ключевое слово обнаружено в «{recognized_text}». Диалог открыт на 60 секунд.")
+                                    self.wake_state = "ACTIVE"
+                                    self.active_until = now + self.ACTIVE_DURATION
+                            else:
+                                # В активном режиме проверяем команду засыпания
+                                _, text_lower = self.wake_detector.check_audio_for_wake_word(user_audio_bytes)
+                                sleep_triggers = ["отбой", "спать", "хватит", "пока джарвис", "отключись", "засыпай", "замолчи"]
+                                if any(st in text_lower for st in sleep_triggers):
+                                    log_event("VAD", f"Команда отбоя: «{text_lower}». Джарвис засыпает.")
+                                    self.wake_state = "STANDBY"
+                                    self.avatar.set_state("STANDBY", "💤 ЖДУ «ДЖАРВИС»")
+                                    continue
+
+                                # Продлеваем активный диалог еще на 60 секунд!
+                                self.active_until = now + self.ACTIVE_DURATION
+
                             self.turn_sent_time = now
-                            self.avatar.set_state("THINKING")
-                            log_event("VAD", f"Конец фразы ({dur:.2f}с). Отправка turn_complete в Gemini...")
+                            self.avatar.set_state("THINKING", "⏳ ОБРАБОТКА...")
+                            log_event("VAD", f"Конец фразы ({dur:.2f}с). Отправка запроса в Gemini...")
 
                             parts = [
                                 types.Part(
@@ -1794,7 +1897,10 @@ class GeminiLiveEngine:
                     if getattr(server_content, "turn_complete", False):
                         log_event("GEMINI", f"Раунд #{turn_count} завершен сервером.")
                         if self.audio_out_queue.empty() and not self.is_speaking:
-                            self.avatar.set_state("STANDBY")
+                            target = "ACTIVE" if self.wake_state == "ACTIVE" else "STANDBY"
+                            remaining = max(0, int(self.active_until - time.time()))
+                            subtext = f"● НА СВЯЗИ ({remaining}с)" if self.wake_state == "ACTIVE" else "💤 ЖДУ «ДЖАРВИС»"
+                            self.avatar.set_state(target, subtext)
 
                 if message.tool_call:
                     for call in message.tool_call.function_calls:

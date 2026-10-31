@@ -6,3 +6,5 @@ mss>=9.0.0
 pillow>=10.0.0
 PyQt6>=6.6.0
 pyautogui>=0.9.54
+psutil>=5.9.0
+vosk>=0.3.45
