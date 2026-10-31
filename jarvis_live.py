@@ -76,7 +76,7 @@ def load_config() -> dict:
             log_event("ERROR", f"Ошибка загрузки config.json: {e}")
     return {
         "gemini_api_key": "",
-        "proxy": "http://127.0.0.1:10809",
+        "proxy": "",
         "voice_name": "Fenrir",
         "model": "gemini-3.8-live",
         "opacity": 0.78,
@@ -92,11 +92,36 @@ def save_config(cfg: dict):
 
 CONFIG = load_config()
 
-# Configure proxy if specified
-if CONFIG.get("proxy"):
-    os.environ["HTTP_PROXY"] = CONFIG["proxy"]
-    os.environ["HTTPS_PROXY"] = CONFIG["proxy"]
-    log_event("INIT", f"Настроен прокси: {CONFIG['proxy']}")
+def check_proxy_alive(proxy_url: str) -> bool:
+    """Проверяет доступность локального или удаленного прокси за 0.3 секунды."""
+    if not proxy_url or not isinstance(proxy_url, str) or not proxy_url.strip():
+        return False
+    try:
+        from urllib.parse import urlparse
+        import socket
+        parsed = urlparse(proxy_url)
+        host = parsed.hostname or "127.0.0.1"
+        port = parsed.port or (443 if parsed.scheme == "https" else 8080)
+        with socket.create_connection((host, port), timeout=0.3):
+            return True
+    except Exception:
+        return False
+
+# Smart Proxy Configuration: automatically verify connectivity
+configured_proxy = str(CONFIG.get("proxy") or "").strip()
+if configured_proxy:
+    if check_proxy_alive(configured_proxy):
+        os.environ["HTTP_PROXY"] = configured_proxy
+        os.environ["HTTPS_PROXY"] = configured_proxy
+        log_event("INIT", f"Прокси активен и доступен: {configured_proxy}")
+    else:
+        log_event("INIT", f"Указанный прокси ({configured_proxy}) недоступен. Используется прямое подключение.")
+        os.environ.pop("HTTP_PROXY", None)
+        os.environ.pop("HTTPS_PROXY", None)
+else:
+    log_event("INIT", "Прокси не задан, используется прямое подключение.")
+    os.environ.pop("HTTP_PROXY", None)
+    os.environ.pop("HTTPS_PROXY", None)
 
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QMenu, QInputDialog, QMessageBox, QSystemTrayIcon
