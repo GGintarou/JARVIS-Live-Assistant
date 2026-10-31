@@ -278,20 +278,23 @@ class ActuationSystem:
         self.em = em
 
     def scale_coordinates(self, x: float, y: float) -> tuple[int, int]:
-        """Scales coordinates from vision model space (1280x720) to physical display (1920x1080 @ 100Hz)."""
+        """
+        Scales coordinates to physical display (1920x1080 @ 100Hz).
+        Gemini vision models output normalized [0..1000] integer coordinates.
+        """
         screen_w, screen_h = pyautogui.size()
         fx, fy = float(x), float(y)
-        # Normalized 0.0 .. 1.0
+        # 1. Normalized float 0.0 .. 1.0
         if 0.0 <= fx <= 1.0 and 0.0 <= fy <= 1.0:
             rx = int(round(fx * screen_w))
             ry = int(round(fy * screen_h))
             return max(0, min(screen_w - 1, rx)), max(0, min(screen_h - 1, ry))
-        # Vision space 1280x720 (1.5x scale)
-        if 0 <= fx <= CAPTURE_W and 0 <= fy <= CAPTURE_H:
-            rx = int(round(fx * (screen_w / float(CAPTURE_W))))
-            ry = int(round(fy * (screen_h / float(CAPTURE_H))))
+        # 2. Gemini standard normalized integer space (0 .. 1000)
+        if 0 <= fx <= 1000 and 0 <= fy <= 1000:
+            rx = int(round((fx / 1000.0) * screen_w))
+            ry = int(round((fy / 1000.0) * screen_h))
             return max(0, min(screen_w - 1, rx)), max(0, min(screen_h - 1, ry))
-        # Physical coordinates
+        # 3. Physical coordinates fallback (> 1000)
         rx, ry = int(round(fx)), int(round(fy))
         return max(0, min(screen_w - 1, rx)), max(0, min(screen_h - 1, ry))
 
@@ -312,7 +315,13 @@ class ActuationSystem:
             pyautogui.moveTo(rx, ry)
             return f"Актуатор: позиционирование курсора в ({rx}, {ry})."
         elif act in ["type", "input"]:
-            pyautogui.write(text, interval=0.01)
+            try:
+                import pyperclip
+                pyperclip.copy(text)
+                time.sleep(0.04)
+                pyautogui.hotkey("ctrl", "v")
+            except Exception:
+                pyautogui.write(text, interval=0.01)
             return f"Актуатор: ввод текстового потока ({len(text)} симв)."
         elif act in ["key", "hotkey"]:
             keys = [k.strip().lower() for k in text.replace("+", " ").split()]
@@ -417,26 +426,90 @@ class ActuationSystem:
                     return f"Ошибка завершения процесса: {e}"
         return f"Неизвестный уровень закрытия: {level}"
 
+def find_windows_app(name: str) -> Optional[str]:
+    """Finds installed application executable or shortcut across Windows."""
+    name_clean = name.lower().strip()
+    aliases = {
+        "discord": "discord",
+        "дискорд": "discord",
+        "диск": "discord",
+        "telegram": "telegram",
+        "телеграм": "telegram",
+        "телега": "telegram",
+        "тг": "telegram",
+        "яндекс": "yandex",
+        "yandex": "yandex",
+        "яндекс музыка": "https://music.yandex.ru",
+        "музыка": "https://music.yandex.ru",
+        "музыку": "https://music.yandex.ru",
+        "music": "https://music.yandex.ru",
+        "steam": "steam",
+        "стим": "steam",
+        "davinci": "resolve",
+        "давинчи": "resolve",
+        "youtube": "https://youtube.com",
+        "ютуб": "https://youtube.com",
+        "ютубчик": "https://youtube.com",
+        "вк": "https://vk.com",
+        "погода": "https://yandex.ru/pogoda"
+    }
+    target = aliases.get(name_clean, name_clean)
+    if target.startswith(("http://", "https://")):
+        return target
+
+    # Search common Windows shortcut locations
+    search_dirs = [
+        os.path.expanduser("~/Desktop"),
+        os.path.expandvars(r"%APPDATA%\Microsoft\Windows\Start Menu\Programs"),
+        os.path.expandvars(r"%ProgramData%\Microsoft\Windows\Start Menu\Programs"),
+        os.path.expandvars(r"%LOCALAPPDATA%\Programs"),
+        os.path.expandvars(r"%LOCALAPPDATA%"),
+    ]
+    for d in search_dirs:
+        if not os.path.exists(d):
+            continue
+        for root, dirs, files in os.walk(d):
+            for f in files:
+                f_lower = f.lower()
+                if f_lower.endswith((".lnk", ".exe")):
+                    base = os.path.splitext(f_lower)[0]
+                    if target in base:
+                        return os.path.join(root, f)
+
+    # Windows URI protocol check
+    if target in ["telegram", "discord", "steam"]:
+        return f"{target}://"
+
+    return None
+
     def route_intent(self, target: str) -> str:
-        """Universal Intent Router (URLs, paths, system protocols) with zero object hardcoding."""
+        """Universal Intent Router (URLs, applications, paths, system protocols)."""
         t = target.strip()
-        # Web URI
-        if t.startswith("http://") or t.startswith("https://") or "." in t and not " " in t and not "\\" in t:
+        # 1. Web URI
+        if t.startswith(("http://", "https://")) or ("." in t and not " " in t and not "\\" in t and "/" in t):
             url = t if t.startswith("http") else "https://" + t
             os.startfile(url)
             return f"Маршрутизация намерения: открыт веб-ресурс {url}."
 
-        # File system path or shortcut
+        # 2. Windows Applications & Shortcuts resolver
+        resolved = find_windows_app(t)
+        if resolved:
+            try:
+                os.startfile(resolved)
+                return f"Маршрутизация намерения: успешно запущено приложение '{t}' ({resolved})."
+            except Exception:
+                pass
+
+        # 3. File system path
         if os.path.exists(t):
             os.startfile(t)
             return f"Маршрутизация намерения: открыт системный ресурс {t}."
 
-        # System start resolution
+        # 4. System start resolution
         try:
             os.startfile(t)
             return f"Маршрутизация намерения: активирован системный протокол {t}."
         except Exception:
-            # Fallback via silent start
             try:
                 import subprocess
                 subprocess.Popen(f"start {t}", shell=True, creationflags=0x08000000)

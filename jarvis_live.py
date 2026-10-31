@@ -146,9 +146,8 @@ CAPTURE_W, CAPTURE_H = 1280, 720
 
 def scale_mouse_coordinates(x: int | float, y: int | float) -> tuple[int, int]:
     """
-    Scales coordinates from vision model space (1280x720) or native screen space (1920x1080)
-    to physical Windows screen coordinates (1920x1080 @ 100 Hz).
-    Eliminates all offsets and coordinate ambiguity.
+    Scales coordinates to physical Windows screen coordinates (1920x1080 @ 100 Hz).
+    Gemini vision models output normalized [0..1000] integer coordinates.
     """
     screen_w, screen_h = pyautogui.size()
     try:
@@ -157,19 +156,19 @@ def scale_mouse_coordinates(x: int | float, y: int | float) -> tuple[int, int]:
     except Exception:
         return 0, 0
 
-    # Normalized float coordinates 0.0 .. 1.0
-    if 0.0 <= fx <= 1.0 and 0.0 <= fy <= 1.0 and isinstance(x, float) and isinstance(y, float):
+    # 1. Normalized float coordinates 0.0 .. 1.0
+    if 0.0 <= fx <= 1.0 and 0.0 <= fy <= 1.0:
         real_x = int(round(fx * screen_w))
         real_y = int(round(fy * screen_h))
         return max(0, min(screen_w - 1, real_x)), max(0, min(screen_h - 1, real_y))
 
-    # Standard vision stream frame (1280x720): maps directly via 1.5x scaling to 1920x1080
-    if 0 <= fx <= CAPTURE_W and 0 <= fy <= CAPTURE_H:
-        real_x = int(round(fx * (screen_w / float(CAPTURE_W))))
-        real_y = int(round(fy * (screen_h / float(CAPTURE_H))))
+    # 2. Standard Gemini normalized integer space (0 .. 1000)
+    if 0 <= fx <= 1000 and 0 <= fy <= 1000:
+        real_x = int(round((fx / 1000.0) * screen_w))
+        real_y = int(round((fy / 1000.0) * screen_h))
         return max(0, min(screen_w - 1, real_x)), max(0, min(screen_h - 1, real_y))
 
-    # Physical screen coordinates (already 1920x1080)
+    # 3. Native screen space fallback (> 1000)
     real_x = int(round(fx))
     real_y = int(round(fy))
     return max(0, min(screen_w - 1, real_x)), max(0, min(screen_h - 1, real_y))
@@ -284,7 +283,7 @@ def get_dynamic_system_prompt() -> str:
 ФИЛОСОФИЯ СУЩНОСТЕЙ И КОМПОНЕНТОВ (БЕЗ ЖЕСТКИХ ОБЪЕКТОВ):
 В операционной системе нет изолированных «конкретных объектов» (нет жестко привязанных классов для браузеров, редакторов или сайтов).
 Весь воспринимаемый мир состоит из абстрактных Сущностей (Entities), обладающих динамическим набором Компонентов:
-- SpatialComponent: координаты и границы в пространстве отображения (1280x720 кадр -> 1920x1080 @ 100 Гц монитор).
+- SpatialComponent: координаты и границы в нормализованном пространстве 0..1000 (0,0 — верхний левый угол, 500,500 — центр, 1000,1000 — правый нижний угол) на монитор 1920x1080 @ 100 Гц.
 - VisualComponent: оптический текст, символы и визуальные паттерны, воспринимаемые зрительной корой.
 - SurfaceComponent: оконная поверхность ОС, заголовок, состояние активности (foreground/active/minimized).
 - ProcessComponent: системный процесс, PID, память.
@@ -294,23 +293,24 @@ def get_dynamic_system_prompt() -> str:
 УНИВЕРСАЛЬНЫЕ РЕФЛЕКТОРНЫЕ АКТУАТОРЫ:
 1. ПРИНЦИП МГНОВЕННОЙ РЕФЛЕКТОРНОЙ ДУГИ (ДЕЙСТВИЕ БЕЗ ЗАДЕРЖЕК):
    - Вызывай актуатор ОДНОВРЕМЕННО с первой реакцией.
-   - КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО говорить «я закрываю», «проверяю», «минутку», если актуатор не был вызван! Сначала реальное физическое воздействие, затем краткий отчёт в 1 предложение.
-2. ПРОСТРАНСТВЕННАЯ МОТОРИКА: `actuate_spatial(x, y, action='click'|'right_click'|'double_click'|'key'|'type', text='...')`.
-   - Монитор: DF24H100, 1920×1080 пикселей, 100 Гц.
-   - Координаты зрительного кадра (0..1280, 0..720) точно масштабируются с шагом 1.5. Центр экрана — x=640, y=360 (960x540).
-   - Клик по видео, кнопке или ссылке: `actuate_spatial(x=..., y=..., action='click')`.
-   - Горячие клавиши (разрезать в монтаже Ctrl+B, пауза Space, Ctrl+Z, Enter): `actuate_spatial(action='key', text='...')`.
-3. РЕФЛЕКС ЗАКРЫТИЯ КОНТЕКСТА: `dismiss_active_surface(level='tab'|'window'|'process')`.
-   - level='tab': закрыть активную вкладку или документ текущей поверхности (Ctrl+W).
-   - level='window': закрыть активную поверхность (Alt+F4).
-   - level='process': завершить процесс активной сущности.
-4. МАРШРУТИЗАЦИЯ НАМЕРЕНИЙ: `route_intent(target='...')`.
-   - Универсальный запуск любых веб-ресурсов (URL), протоколов или приложений без знания жестких путей.
-5. АКТУАЦИЯ СУЩНОСТЕЙ: `actuate_entity(entity_id, action='focus'|'dismiss'|'actuate'|'input', text='...')`.
-   - Переключение фокуса на поверхность сущности или прямое управление её жизненным циклом.
-6. СКАНИРОВАНИЕ МИРА: `query_entities(semantic_query=...)`.
-   - Возвращает снимок всех воспринимаемых сущностей ОС и их компонентов.
-7. ЗРИТЕЛЬНАЯ КОРА: `inspect_screen()`.
+   - КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО говорить «я открываю», «проверяю», «минутку», если актуатор не был вызван! Сначала реальное физическое воздействие, затем краткий отчёт в 1 предложение.
+2. ЗАПУСК ПРИЛОЖЕНИЙ: `open_application(app_name='discord'|'telegram'|'yandex'|'steam'|'davinci'|...)`.
+   - Если пользователь просит «открой Дискорд», «запусти Телеграм», «открой Яндекс» — ВСЕГДА вызывай `open_application`.
+3. МУЗЫКА И МЕДИА: `play_music(query='...')`.
+   - Если пользователь говорит «включи музыку», «включи фонк», «поставь песню» — вызывай `play_music(query=...)`.
+4. СООБЩЕНИЯ В TELEGRAM: `send_telegram_message(recipient='Имя друга', text='Текст')`.
+   - Если пользователь просит отправить сообщение («напиши [Имя] в Телеграме [сообщение]») — вызывай `send_telegram_message`.
+5. ПРОГНОЗ ПОГОДЫ: `get_weather(city='...')`.
+   - Если пользователь спрашивает «какая погода?» — вызывай `get_weather`.
+6. ПРОСТРАНСТВЕННАЯ МОТОРИКА: `actuate_spatial(x, y, action='click'|'right_click'|'double_click'|'key'|'type', text='...')`.
+   - Координаты указывай в пространстве 0..1000: центр экрана x=500, y=500.
+   - Ввод текста (`action='type'`): полностью поддерживает русский и английский язык (слово «Привет», фразы, ссылки).
+   - Горячие клавиши (разрезать в DaVinci Ctrl+B, пауза Space, закрыть вкладку Ctrl+W, Enter): `actuate_spatial(action='key', text='...')`.
+7. РЕФЛЕКС ЗАКРЫТИЯ КОНТЕКСТА: `dismiss_active_surface(level='tab'|'window'|'process')`.
+   - level='tab': закрыть активную вкладку (Ctrl+W).
+   - level='window': закрыть окно (Alt+F4).
+   - level='process': завершить процесс активного приложения.
+8. ЗРИТЕЛЬНАЯ КОРА: `inspect_screen()`.
    - Передает оптический HD-кадр экрана в зрительную кору.
 
 СТИЛЬ И ГИБКОСТЬ:
@@ -597,6 +597,78 @@ def focus_window_action(window_name: str) -> str:
     except Exception as e:
         return f"Не удалось сфокусировать окно {name}: {e}"
 
+def send_telegram_message_action(recipient: str, text: str) -> str:
+    """Finds/focuses Telegram, searches for recipient, and sends message text."""
+    try:
+        import pyperclip
+        t_app = ecs_core.find_windows_app("telegram")
+        if t_app:
+            try:
+                os.startfile(t_app)
+                time.sleep(0.4)
+            except Exception:
+                pass
+
+        for win in pyautogui.getAllWindows():
+            if "telegram" in win.title.lower():
+                try:
+                    win.activate()
+                    time.sleep(0.2)
+                except Exception:
+                    pass
+                break
+
+        pyautogui.hotkey("ctrl", "k")
+        time.sleep(0.15)
+        pyperclip.copy(recipient)
+        pyautogui.hotkey("ctrl", "v")
+        time.sleep(0.35)
+        pyautogui.press("enter")
+        time.sleep(0.3)
+
+        pyperclip.copy(text)
+        pyautogui.hotkey("ctrl", "v")
+        time.sleep(0.15)
+        pyautogui.press("enter")
+        return f"Сообщение '{text}' успешно отправлено в Telegram получателю '{recipient}'."
+    except Exception as e:
+        return f"Ошибка отправки сообщения в Telegram: {e}"
+
+def play_music_action(query: str = "") -> str:
+    """Opens Yandex Music or YouTube Music and starts playback."""
+    q = query.strip()
+    if q:
+        import urllib.parse
+        encoded = urllib.parse.quote(q)
+        url = f"https://music.yandex.ru/search?text={encoded}"
+    else:
+        url = "https://music.yandex.ru"
+    try:
+        os.startfile(url)
+    except Exception:
+        webbrowser.open(url)
+    try:
+        user32.keybd_event(0xB3, 0, 1, 0)
+        user32.keybd_event(0xB3, 0, 3, 0)
+    except Exception:
+        pass
+    return f"Запущена музыка ({url})."
+
+def get_weather_action(city: str = "") -> str:
+    """Opens weather report for requested or local city."""
+    c = city.strip()
+    if c:
+        import urllib.parse
+        encoded = urllib.parse.quote(f"погода {c}")
+        url = f"https://yandex.ru/search/?text={encoded}"
+    else:
+        url = "https://yandex.ru/pogoda"
+    try:
+        os.startfile(url)
+    except Exception:
+        webbrowser.open(url)
+    return f"Открыта сводка погоды ({url})."
+
 # ==============================================================================
 # Main Tool Dispatcher
 # ==============================================================================
@@ -675,8 +747,23 @@ def execute_tool(name: str, args: dict, engine_ref=None) -> str:
             res = ECS_ACTUATION.route_intent(app)
             log_event("ROUTER", f"{res} (за {time.time()-t_start:.3f}с)")
             return res
-            app = args.get("app_name", "").strip()
-            res = launch_application(app)
+
+        elif name == "send_telegram_message":
+            recipient = args.get("recipient", "").strip()
+            msg_text = args.get("text", "").strip()
+            res = send_telegram_message_action(recipient, msg_text)
+            log_event("TOOL", f"{res} (за {time.time()-t_start:.3f}с)")
+            return res
+
+        elif name == "play_music":
+            q = args.get("query", "").strip()
+            res = play_music_action(q)
+            log_event("TOOL", f"{res} (за {time.time()-t_start:.3f}с)")
+            return res
+
+        elif name == "get_weather":
+            city = args.get("city", "").strip()
+            res = get_weather_action(city)
             log_event("TOOL", f"{res} (за {time.time()-t_start:.3f}с)")
             return res
 
@@ -1354,11 +1441,11 @@ class GeminiLiveEngine:
         self.turn_sent_time = 0.0
         self.async_loop = None
 
-        # Wake-Word & Active Conversation State (60s timer)
+        # Wake-Word & Active Conversation State (15s timer)
         self.wake_detector = WakeWordDetector()
         self.wake_state = "STANDBY"         # "STANDBY" (спит и фильтрует) или "ACTIVE" (на связи)
         self.active_until = 0.0             # timestamp окончания активного режима
-        self.ACTIVE_DURATION = 60.0         # 60 секунд окна диалога после каждого обращения
+        self.ACTIVE_DURATION = 15.0         # 15 секунд окна диалога после каждого обращения
 
         self.avatar.sig_interrupt.connect(self.trigger_interrupt)
 
@@ -1473,18 +1560,18 @@ class GeminiLiveEngine:
             # ------------------------------------------------------------------
             types.FunctionDeclaration(
                 name="actuate_spatial",
-                description="Универсальный пространственный актуатор (рефлекторная моторика) по координатам кадра 1280x720 (точное масштабирование 1.5x на монитор 1920x1080 @ 100 Гц): клик мышью (click, right_click, double_click, move), передача сигналов клавиш (key, например 'ctrl+w', 'ctrl+b', 'space', 'alt+f4', 'enter') или ввод текста (type).",
+                description="Универсальный пространственный актуатор (рефлекторная моторика): физический клик мышью (click, right_click, double_click, move) по нормализованным координатам 0..1000 (0 - левый/верхний край, 500 - центр, 1000 - правый/нижний край экрана), передача сигналов клавиш (key, например 'ctrl+w', 'ctrl+b', 'space', 'alt+f4', 'enter') или ввод текста на русском и английском (type).",
                 behavior="NON_BLOCKING",
                 parameters={
                     "type": "OBJECT",
                     "properties": {
-                        "x": {"type": "INTEGER", "description": "Координата X зрительного кадра (0..1280)"},
-                        "y": {"type": "INTEGER", "description": "Координата Y зрительного кадра (0..720)"},
+                        "x": {"type": "INTEGER", "description": "Нормализованная координата X экрана от 0 до 1000 (0 = лево, 500 = центр, 1000 = право)"},
+                        "y": {"type": "INTEGER", "description": "Нормализованная координата Y экрана от 0 до 1000 (0 = верх, 500 = центр, 1000 = низ)"},
                         "action": {
                             "type": "STRING",
                             "description": "'click', 'right_click', 'double_click', 'move', 'key', 'type'"
                         },
-                        "text": {"type": "STRING", "description": "Клавиши ('ctrl+b', 'space', 'ctrl+w') или текст для набора"}
+                        "text": {"type": "STRING", "description": "Клавиши ('ctrl+b', 'space', 'ctrl+w', 'enter') или текст для набора на русском/английском"}
                     },
                     "required": ["action"]
                 }
@@ -1584,12 +1671,47 @@ class GeminiLiveEngine:
             ),
             types.FunctionDeclaration(
                 name="open_application",
-                description="Псевдоним маршрутизатора намерения: запуск приложения, ссылки или ярлыка.",
+                description="Маршрутизатор запуска приложений и программ: мгновенно запускает любые установленные приложения ('discord', 'telegram', 'yandex', 'steam', 'davinci' и др.) или ярлыки.",
                 behavior="NON_BLOCKING",
                 parameters={
                     "type": "OBJECT",
-                    "properties": {"app_name": {"type": "STRING", "description": "Имя программы или протокол"}},
+                    "properties": {"app_name": {"type": "STRING", "description": "Имя программы ('discord', 'telegram', 'yandex', 'яндекс музыка', 'steam', 'погода')"}},
                     "required": ["app_name"]
+                }
+            ),
+            types.FunctionDeclaration(
+                name="send_telegram_message",
+                description="Отправляет сообщение в Telegram: открывает приложение, находит указанного друга/контакт по имени, открывает переписку и отправляет текст.",
+                behavior="NON_BLOCKING",
+                parameters={
+                    "type": "OBJECT",
+                    "properties": {
+                        "recipient": {"type": "STRING", "description": "Имя контакта, друга или чата в Telegram"},
+                        "text": {"type": "STRING", "description": "Текст сообщения для отправки"}
+                    },
+                    "required": ["recipient", "text"]
+                }
+            ),
+            types.FunctionDeclaration(
+                name="play_music",
+                description="Включает музыку (Яндекс Музыка, YouTube): открывает сервис и начинает воспроизведение трека/жанра или нажимает Play/Pause.",
+                behavior="NON_BLOCKING",
+                parameters={
+                    "type": "OBJECT",
+                    "properties": {
+                        "query": {"type": "STRING", "description": "Трек, исполнитель или жанр (например 'фонк', 'рок', или пусто для Яндекс Музыки)"}
+                    }
+                }
+            ),
+            types.FunctionDeclaration(
+                name="get_weather",
+                description="Открывает прогноз погоды для указанного города или региона.",
+                behavior="NON_BLOCKING",
+                parameters={
+                    "type": "OBJECT",
+                    "properties": {
+                        "city": {"type": "STRING", "description": "Город (например 'Москва', или пусто для текущего)"}
+                    }
                 }
             ),
             # Self-Learning Tools
@@ -1736,7 +1858,7 @@ class GeminiLiveEngine:
                     subtext = f"● НА СВЯЗИ ({max(0, int(self.active_until - now))}с)" if self.wake_state == "ACTIVE" else "💤 ЖДУ «ДЖАРВИС»"
                     self.avatar.set_state(target, subtext)
 
-            # 2. Обратный отсчет 60 секунд активного диалога
+            # 2. Обратный отсчет 15 секунд активного диалога
             if self.wake_state == "ACTIVE":
                 remaining = int(self.active_until - now)
                 if remaining > 0:
@@ -1744,7 +1866,7 @@ class GeminiLiveEngine:
                         self.avatar.set_state("ACTIVE", f"● НА СВЯЗИ ({remaining}с)")
                 else:
                     self.wake_state = "STANDBY"
-                    log_event("CONV", "Таймаут 60 секунд безмолвия. Джарвис уснул и ждет слова «Джарвис».")
+                    log_event("CONV", "Таймаут 15 секунд безмолвия. Джарвис уснул и ждет слова «Джарвис».")
                     self.avatar.set_state("STANDBY", "💤 ЖДУ «ДЖАРВИС»")
 
     async def _vad_audio_loop(self, session):
@@ -1827,7 +1949,7 @@ class GeminiLiveEngine:
                                     self.avatar.set_state("STANDBY", "💤 ЖДУ «ДЖАРВИС»")
                                     continue
                                 else:
-                                    log_event("VAD", f"⚡ АКТИВАЦИЯ! Ключевое слово обнаружено в «{recognized_text}». Диалог открыт на 60 секунд.")
+                                    log_event("VAD", f"⚡ АКТИВАЦИЯ! Ключевое слово обнаружено в «{recognized_text}». Диалог открыт на 15 секунд.")
                                     self.wake_state = "ACTIVE"
                                     self.active_until = now + self.ACTIVE_DURATION
                             else:
@@ -1840,7 +1962,7 @@ class GeminiLiveEngine:
                                     self.avatar.set_state("STANDBY", "💤 ЖДУ «ДЖАРВИС»")
                                     continue
 
-                                # Продлеваем активный диалог еще на 60 секунд!
+                                # Продлеваем активный диалог еще на 15 секунд!
                                 self.active_until = now + self.ACTIVE_DURATION
 
                             self.turn_sent_time = now
@@ -1931,6 +2053,12 @@ class GeminiLiveEngine:
                             subtext = "◈ СКАН ЭКРАНА"
                         elif "search" in tool_name:
                             subtext = "⚡ ПОИСК"
+                        elif "telegram" in tool_name or "message" in tool_name:
+                            subtext = "💬 TELEGRAM"
+                        elif "music" in tool_name:
+                            subtext = "🎵 МУЗЫКА"
+                        elif "weather" in tool_name:
+                            subtext = "🌤️ ПОГОДА"
                         elif "app" in tool_name:
                             subtext = "🚀 ЗАПУСК"
                         elif "learn" in tool_name or "memory" in tool_name:
